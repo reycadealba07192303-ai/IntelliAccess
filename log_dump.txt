@@ -1,0 +1,49 @@
+[
+  {
+    "_id": "69a0f496cead7cdebc3fbab1",
+    "plate_detected": "ABY8512",
+    "action": "Exit",
+    "status": "GRANTED",
+    "gate": "Main Gate Entry",
+    "timestamp": "2026-02-27T09:34:14.557740",
+    "image_url": "/static/captures/capture_1772156054.jpg",
+    "vehicle_id": "69a053ef1fb5d0033e149e2f"
+  },
+  {
+    "_id": "69a0ea3499a91b12bced839c",
+    "plate_detected": "OYYE826",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate Entry",
+    "timestamp": "2026-02-27T08:49:56.039068",
+    "image_url": "/static/captures/capture_1772153396.jpg"
+  },
+  {
+    "_id": "69a0ea2b99a91b12bced839b",
+    "plate_detected": "OY6978",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate Entry",
+    "timestamp": "2026-02-27T08:49:47.089144",
+    "image_url": "/static/captures/capture_1772153387.jpg"
+  },
+  {
+    "_id": "69a0e9e499a91b12bced8399",
+    "plate_detected": "ABY8512",
+    "action": "Entry",
+    "status": "GRANTED",
+    "gate": "Main Gate Entry",
+    "timestamp": "2026-02-27T08:48:36.091594",
+    "image_url": "/static/captures/capture_1772153316.jpg",
+    "vehicle_id": "69a053ef1fb5d0033e149e2f"
+  },
+  {
+    "_id": "69a0e9ca99a91b12bced8398",
+    "plate_detected": "ABY8512RECION",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate Entry",
+    "timestamp": "2026-02-27T08:48:10.408820",
+    "image_url": "/static/captures/capture_1772153290.jpg"
+  }
+]

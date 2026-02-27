@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-dotenv
+pymongo
+passlib[bcrypt]
+# AI Libraries
+opencv-python-headless
+ultralytics
+easyocr
+# jupyter
+pyjwt
+python-multipart
+# opencv-python

@@ -1,0 +1,19 @@
+src/app/App.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/app/components/ui/glass-toast.tsx(1,1): error TS6192: All imports in import declaration are unused.
+src/app/components/ui/glass-toast.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/app/components/ui/glass-toast.tsx(4,1): error TS6133: 'GlassCard' is declared but its value is never read.
+src/app/pages/admin/notifications.tsx(8,5): error TS6133: 'Filter' is declared but its value is never read.
+src/app/pages/admin/vehicles.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/app/pages/admin/vehicles.tsx(2,21): error TS6133: 'GlassButton' is declared but its value is never read.
+src/app/pages/admin/vehicles.tsx(3,18): error TS6133: 'Filter' is declared but its value is never read.
+src/app/pages/admin/vehicles.tsx(3,39): error TS6133: 'XCircle' is declared but its value is never read.
+src/app/pages/auth/forgot-password.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/app/pages/dashboard/user-settings.tsx(13,5): error TS6133: 'Camera' is declared but its value is never read.
+src/app/pages/dashboard/user-settings.tsx(34,12): error TS6133: 'coverImage' is declared but its value is never read.
+src/app/pages/dashboard/user-settings.tsx(34,24): error TS6133: 'setCoverImage' is declared but its value is never read.
+src/app/pages/landing.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/app/pages/landing.tsx(7,3): error TS6133: 'BellRing' is declared but its value is never read.
+src/app/pages/landing.tsx(8,3): error TS6133: 'ArrowRight' is declared but its value is never read.
+src/app/pages/landing.tsx(14,3): error TS6133: 'Phone' is declared but its value is never read.
+src/app/pages/landing.tsx(19,10): error TS6133: 'GlassCard' is declared but its value is never read.
+src/app/pages/landing.tsx(19,34): error TS6133: 'GlassInput' is declared but its value is never read.

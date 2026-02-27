@@ -1,0 +1,56 @@
+[
+  {
+    "_id": "699fa2b9908b0abcdb085771",
+    "title": "Vehicle Deleted",
+    "message": "Reyca De Alba deleted vehicle CAX 3200.",
+    "user_id": "699f9eddf5000a92e5edb1c5",
+    "type": "alert",
+    "read": false,
+    "created_at": "2026-02-26T01:32:41.310298"
+  },
+  {
+    "_id": "699fa27e908b0abcdb085770",
+    "title": "Vehicle Registered",
+    "message": "New vehicle HONDA (CAX 3200) added by John Doe.",
+    "user_id": "699f9eddf5000a92e5edb1c5",
+    "type": "user",
+    "read": false,
+    "created_at": "2026-02-26T01:31:42.817457"
+  },
+  {
+    "_id": "699fa22f908b0abcdb08576e",
+    "title": "Vehicle Deleted",
+    "message": "John Doe deleted vehicle 123ABC.",
+    "user_id": "699f9eddf5000a92e5edb1c5",
+    "type": "alert",
+    "read": false,
+    "created_at": "2026-02-26T01:30:23.720173"
+  },
+  {
+    "_id": "699fa220908b0abcdb08576d",
+    "title": "Profile Updated",
+    "message": "John Does updated their profile.",
+    "user_id": "699f9eddf5000a92e5edb1c5",
+    "type": "update",
+    "read": false,
+    "created_at": "2026-02-26T01:30:08.711512"
+  },
+  {
+    "_id": "699fa20d908b0abcdb08576c",
+    "title": "Vehicle Registered",
+    "message": "New vehicle VIOS (123ABC) added by John Does.",
+    "user_id": "699f9eddf5000a92e5edb1c5",
+    "type": "user",
+    "read": false,
+    "created_at": "2026-02-26T01:29:49.150274"
+  },
+  {
+    "_id": "699f9eddf5000a92e5edb1c6",
+    "title": "New Account Created",
+    "message": "John Does created a new FACULTY account.",
+    "user_id": null,
+    "type": "user",
+    "read": false,
+    "created_at": "2026-02-26T01:16:13.280477"
+  }
+]
