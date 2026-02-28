@@ -1,5 +1,5 @@
 // lib/api.ts
-export const API_BASE_URL = 'http://127.0.0.1:8000';
+export const API_BASE_URL = 'https://unemptied-unsurrealistically-danyel.ngrok-free.dev';
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     // Get token from localStorage (assuming we store it there on login)
