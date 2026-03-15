@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from backend.endpoints.auth import get_current_user
+from endpoints.auth import get_current_user
 from backend.mongo_client import users_collection, vehicles_collection, access_logs_collection
 from datetime import datetime, timedelta, timezone
 

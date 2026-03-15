@@ -1,4 +1,4 @@
-from backend.mongo_client import users_collection
+from mongo_client import users_collection
 
 result = users_collection.update_many(
     {"name": "Reyca Dela Cruz De Alba"},

@@ -1,4 +1,4 @@
-from backend.mongo_client import users_collection, vehicles_collection, access_logs_collection
+from mongo_client import users_collection, vehicles_collection, access_logs_collection
 
 print("--- NEW USERS ---")
 for u in users_collection.find().sort('_id', -1).limit(2):

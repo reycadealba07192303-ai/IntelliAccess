@@ -1,10 +1,10 @@
 import os
 import sys
 
-# Add the parent directory so we can import backend.utils
+# Add the parent directory so we can import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils.sms import send_access_sms
+from utils.sms import send_access_sms
 from dotenv import load_dotenv
 import time
 from datetime import datetime
