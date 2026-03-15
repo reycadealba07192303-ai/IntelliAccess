@@ -7,7 +7,7 @@ def test_get_vehicles():
     # Since we don't have a valid auth token that easily circumvents dependency,
     # let's just create a mock user and call the inner function directly.
     import asyncio
-    from backend.endpoints.vehicles import get_vehicles
+    from endpoints.vehicles import get_vehicles
     
     user = {"id": "699e8ffa5e5208f812daa907", "role": "ADMIN", "name": "Reyca De Alba"}
     try:

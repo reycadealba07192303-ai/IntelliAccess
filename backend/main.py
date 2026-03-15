@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
-from backend.endpoints import auth, vehicles, logs, notifications, stats, cameras, stream
+from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream
 
 load_dotenv()
 
