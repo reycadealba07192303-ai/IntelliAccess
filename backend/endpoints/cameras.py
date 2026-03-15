@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from .auth import get_current_user
-from backend.mongo_client import cameras_collection
+from mongo_client import cameras_collection
 from pydantic import BaseModel
 from bson import ObjectId
 

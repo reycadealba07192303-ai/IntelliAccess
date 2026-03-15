@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import jwt
 import bcrypt
-from backend.mongo_client import users_collection, log_notification
+from mongo_client import users_collection, log_notification
 from bson import ObjectId
 from datetime import datetime, timedelta
 

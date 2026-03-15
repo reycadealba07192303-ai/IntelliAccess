@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from endpoints.auth import get_current_user
-from backend.mongo_client import users_collection, vehicles_collection, access_logs_collection
+from mongo_client import users_collection, vehicles_collection, access_logs_collection
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter()

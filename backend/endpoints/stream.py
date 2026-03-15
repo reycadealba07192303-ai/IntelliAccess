@@ -28,7 +28,7 @@ except Exception as e:
     OCR_AVAILABLE = False
 
 try:
-    from backend.mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
+    from mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
     DB_AVAILABLE = True
 except ImportError:
     print("Warning: Database connection to MongoDB not found. Logs will not be saved.")
@@ -55,7 +55,7 @@ LOG_COOLDOWN_SECONDS = 30 # Wait 30 seconds before logging the exact same plate 
 latest_scan_result = None
 
 import os
-from backend.utils.sms import send_access_sms
+from utils.sms import send_access_sms
 
 def log_plate_detection(plate_text: str, frame=None):
     global last_logged_plate, last_logged_time, latest_scan_result

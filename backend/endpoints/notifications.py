@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 import pymongo
 from .auth import get_current_user
-from backend.mongo_client import notifications_collection
+from mongo_client import notifications_collection
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ async def get_all_notifications(limit: int = 20, offset: int = 0, target_user_id
         cursor = notifications_collection.find(query).sort("created_at", pymongo.DESCENDING).skip(offset).limit(limit)
         notifications = []
         from bson import ObjectId
-        from backend.mongo_client import users_collection
+        from mongo_client import users_collection
         
         for n in cursor:
             n["id"] = str(n["_id"])
@@ -53,7 +53,7 @@ async def get_my_notifications(limit: int = 20, offset: int = 0, user = Depends(
         cursor = notifications_collection.find(query).sort("created_at", pymongo.DESCENDING).skip(offset).limit(limit)
         notifications = []
         from bson import ObjectId
-        from backend.mongo_client import users_collection
+        from mongo_client import users_collection
         
         for n in cursor:
             n["id"] = str(n["_id"])

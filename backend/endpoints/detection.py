@@ -90,7 +90,7 @@ async def detect_vehicle(file: UploadFile = File(...)):
         vehicle_info = None
         
         if detected and plate_text and plate_text not in ["Not Detected", "OCR Error"]:
-            from backend.mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection
+            from mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection
             
             try:
                 # 1. Query the vehicles collection

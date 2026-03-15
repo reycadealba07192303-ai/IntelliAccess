@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from .auth import get_current_user
-from backend.mongo_client import access_logs_collection, vehicles_collection, users_collection, log_notification
+from mongo_client import access_logs_collection, vehicles_collection, users_collection, log_notification
 import pymongo
 from bson import ObjectId
 
@@ -50,7 +50,7 @@ async def create_log(log: AccessLogCreate):
 async def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = None, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
-        from backend.mongo_client import vehicles_collection, users_collection
+        from mongo_client import vehicles_collection, users_collection
         import pymongo
         
         query = {}
@@ -101,7 +101,7 @@ async def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = N
 async def get_my_logs(limit: int = 10, offset: int = 0, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
-        from backend.mongo_client import vehicles_collection
+        from mongo_client import vehicles_collection
         
         my_vehicles_cursor = vehicles_collection.find({"owner_id": user["id"]})
         my_v_ids = [str(v["_id"]) for v in my_vehicles_cursor]

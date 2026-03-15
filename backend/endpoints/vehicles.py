@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from .auth import get_current_user
-from backend.mongo_client import vehicles_collection, log_notification
+from mongo_client import vehicles_collection, log_notification
 
 router = APIRouter()
 
@@ -75,7 +75,7 @@ async def get_vehicles(user = Depends(get_current_user)):
         vehicles_cursor = vehicles_collection.find(query)
         vehicles = []
         from bson import ObjectId
-        from backend.mongo_client import users_collection
+        from mongo_client import users_collection
         
         for v in vehicles_cursor:
             v["id"] = str(v["_id"])
