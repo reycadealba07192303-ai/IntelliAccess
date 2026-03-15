@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
+import sys
+import os
+# Add the current directory to sys.path locally
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream
 
 load_dotenv()
