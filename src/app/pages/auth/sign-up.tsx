@@ -167,6 +167,7 @@ const SignUpPage = () => {
                 <option value="STUDENT">Student</option>
                 <option value="FACULTY">Faculty</option>
                 <option value="STAFF">Staff</option>
+                <option value="ADMIN">Admin</option>
               </select>
               <User className="absolute left-3 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />
               <ChevronDown className="absolute right-4 top-3.5 h-5 w-5 text-slate-400 pointer-events-none" />

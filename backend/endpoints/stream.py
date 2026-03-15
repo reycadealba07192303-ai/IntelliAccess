@@ -28,7 +28,7 @@ except Exception as e:
     OCR_AVAILABLE = False
 
 try:
-    from backend.mongo_client import vehicles_collection, access_logs_collection, users_collection, log_notification
+    from backend.mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
     DB_AVAILABLE = True
 except ImportError:
     print("Warning: Database connection to MongoDB not found. Logs will not be saved.")
@@ -187,7 +187,11 @@ def log_plate_detection(plate_text: str, frame=None):
             if vehicle_info:
                 log_data["vehicle_id"] = vehicle_info.get("id")
                 
-            result = access_logs_collection.insert_one(log_data)
+            if status == "Authorized":
+                result = access_logs_collection.insert_one(log_data)
+            else:
+                result = denied_logs_collection.insert_one(log_data)
+                
             log_entry_id = str(result.inserted_id)
             
             # --- START SMS INTEGRATION ---
@@ -333,7 +337,9 @@ def generate_frames():
                 # 2. Run EasyOCR on the frame (text detection)
                 if reader:
                     try:
-                        ocr_results = reader.readtext(frame, detail=1)
+                        # Use an allowlist to force the AI to ONLY detect uppercase letters and numbers.
+                        # This massively increases accuracy for license plates and stops it from hallucinating symbols or lowercase letters.
+                        ocr_results = reader.readtext(frame, detail=1, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
                         valid_texts = []
                         for result in ocr_results:
                             bbox, text, conf = result
@@ -372,16 +378,9 @@ def generate_frames():
                                 # Join text blocks
                                 combined_text = "".join([item['text'] for item in group])
                                 
-                                # Basic Plate Cleanup
+                                # Advanced Plate Cleanup based on positional Philippine plate formats
                                 import re
                                 clean_text = re.sub(r'[^A-Za-z0-9]', '', combined_text).upper()
-                                
-                                # Specific fix for OCR misreading 'Y' as 'V' based on user request
-                                clean_text = clean_text.replace('V', 'Y')
-                                
-                                # OCR Mapping Fixes for common errors (Optional, but helps with accuracy)
-                                # For example, if it looks like a letter but is a number position, or vice versa
-                                # But a simpler way is to just do a regex match to see if it even looks like a plate
                                 
                                 # Let's see if the cleaned string broadly matches Philippine format (3/4 letters, 3/4 numbers)
                                 # First we'll extract letters and numbers

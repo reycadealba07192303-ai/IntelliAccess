@@ -13,7 +13,8 @@ db = client['intelliaccess']
 # Define collection references
 users_collection = db['users']
 vehicles_collection = db['vehicles']
-access_logs_collection = db['access_logs']
+access_logs_collection = db['access_logs'] # Granted logs
+denied_logs_collection = db['denied_logs'] # Denied logs
 notifications_collection = db['notifications']
 cameras_collection = db['cameras']
 from datetime import datetime

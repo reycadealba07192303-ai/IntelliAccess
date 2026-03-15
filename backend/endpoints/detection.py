@@ -68,13 +68,14 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     try:
                         # detail = 0 means simple output list
                         if reader:
-                             ocr_result = reader.readtext(img, detail=0) 
+                             # Use an allowlist to force the AI to ONLY detect uppercase letters and numbers.
+                             ocr_result = reader.readtext(img, detail=0, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") 
                              if ocr_result:
                                  # Join all found text or pick the best looking one
                                  raw_text = " ".join(ocr_result)
                                  # Clean up the text: remove spaces and non-alphanumeric (keep hyphens)
                                  import re
-                                 plate_text = re.sub(r'[^A-Za-z0-9\-]', '', raw_text).upper()
+                                 plate_text = re.sub(r'[^A-Za-z0-9]', '', raw_text).upper()
                     except Exception as ocr_e:
                         print(f"OCR Error: {ocr_e}")
                         plate_text = "OCR Error"
@@ -89,7 +90,7 @@ async def detect_vehicle(file: UploadFile = File(...)):
         vehicle_info = None
         
         if detected and plate_text and plate_text not in ["Not Detected", "OCR Error"]:
-            from backend.mongo_client import vehicles_collection, access_logs_collection
+            from backend.mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection
             
             try:
                 # 1. Query the vehicles collection
@@ -123,7 +124,10 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 if vehicle_info:
                     log_entry["vehicle_id"] = vehicle_info["id"]
                     
-                access_logs_collection.insert_one(log_entry)
+                if access_granted:
+                    access_logs_collection.insert_one(log_entry)
+                else:
+                    denied_logs_collection.insert_one(log_entry)
                     
             except Exception as db_e:
                 print(f"Database error during detection logic: {db_e}")

@@ -325,7 +325,7 @@ const LandingPage = () => {
                      },
                      {
                         name: "Louize Enzo Celestra",
-                        role: "CEO",
+                        role: "Chief Executive Officer",
                         img: enzoImg
                      },
                      {

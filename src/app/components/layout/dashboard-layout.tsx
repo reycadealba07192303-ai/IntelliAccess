@@ -167,14 +167,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-md lg:hidden"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-slate-900/90 backdrop-blur-xl border-r border-white/10 transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-[70] w-64 transform bg-[#030213]/95 backdrop-blur-xl border-r border-white/10 transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-white/10">
@@ -198,6 +198,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
                 <Link
                   key={item.path}
                   to={item.path}
+                  onClick={() => setIsSidebarOpen(false)}
                   className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${isActive
                     ? "bg-blue-600/20 text-blue-400 border border-blue-600/20"
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-200"

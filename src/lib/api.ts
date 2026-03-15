@@ -1,11 +1,14 @@
 // lib/api.ts
-export const API_BASE_URL = 'https://unemptied-unsurrealistically-danyel.ngrok-free.dev';
+// In production, use the environment variable (e.g. your Render URL). 
+// In local development, dynamically use the current host so that local network devices (like phones) can access the backend.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     // Get token from localStorage (assuming we store it there on login)
     const token = localStorage.getItem('access_token');
 
     const headers: Record<string, string> = {
+        'ngrok-skip-browser-warning': 'true',
         ...(options.headers as Record<string, string> || {}),
     };
 

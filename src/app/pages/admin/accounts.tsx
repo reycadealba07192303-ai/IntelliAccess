@@ -51,7 +51,7 @@ const AccountsPage = () => {
   const [vehicleImages, setVehicleImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
 
-  // Fetch Users from Supabase
+  // Fetch Users from Database
   const fetchUsers = async () => {
     try {
       // 1. Fetch Profiles
@@ -320,7 +320,7 @@ const AccountsPage = () => {
     if (confirm("Are you sure you want to delete this user? This will also delete their profile and vehicles.")) {
       try {
         // Delete from Auth Users (Requires Admin API - skipped for now, just deleting profile)
-        // In a real app, you'd call a Supabase Edge Function to delete the Auth User.
+        // In a real app, you'd call a Backend API to delete the Auth User.
         // For now, we delete the profile which cascades.
         await apiFetch(`/auth/users/${id}`, { method: 'DELETE' });
 
@@ -352,7 +352,7 @@ const AccountsPage = () => {
         // Create User - This is tricky client-side without Admin API 
         // usually enables 'Sign Up' instead. 
         // For now, let's show a notification that this requires the user to Sign Up manually
-        // OR we can call a supabase function if we had one.
+        // OR we can call a backend api if we had one.
         showNotification("To add a new user, please ask them to Sign Up via the registration page.", "info");
         // We won't actually insert here because we can't create Auth users from client-side easily without Service Role
       }

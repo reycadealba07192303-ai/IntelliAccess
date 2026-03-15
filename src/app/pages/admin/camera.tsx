@@ -82,46 +82,105 @@ const CameraPage = () => {
 
     const currentCamera = cameras.find(c => c.id === selectedCamera) || cameras[0] || {};
 
-    // --- Background Polling for Live AI Scans ---
-    useEffect(() => {
-        if (!isAutoScanning) return;
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isStreaming, setIsStreaming] = useState(false);
 
+    // --- Client-Side Camera & AI Scanning ---
+    useEffect(() => {
+        let stream: MediaStream | null = null;
+        let scanInterval: NodeJS.Timeout;
         let clearTimer: NodeJS.Timeout;
 
-        const pollInterval = setInterval(async () => {
+        const startCamera = async () => {
+            if (selectedCamera !== 1) {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                setIsStreaming(false);
+                return;
+            }
+
             try {
-                const response = await fetch(`${API_BASE_URL}/latest-scan`);
-                if (response.ok) {
-                    const data = await response.json();
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } // Prefer back camera on mobile
+                });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    setIsStreaming(true);
+                }
 
-                    // Use a combination of timestamp and ID to ensure we only trigger on fresh scans
-                    if (data.detected && data.timestamp > lastScanTimeRef.current) {
-                        lastScanTimeRef.current = data.timestamp;
-                        setDetectionResult(data);
+                // Start the scanning loop
+                if (isAutoScanning) {
+                    scanInterval = setInterval(async () => {
+                        if (videoRef.current && canvasRef.current && isStreaming) {
+                            const canvas = canvasRef.current;
+                            const video = videoRef.current;
+                            
+                            // Set canvas dimensions to match video
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                // Draw current video frame to canvas
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                
+                                // Convert to blob and send to backend
+                                canvas.toBlob(async (blob) => {
+                                    if (!blob) return;
+                                    
+                                    const formData = new FormData();
+                                    formData.append('file', blob, 'frame.jpg');
 
-                        if (data.access_granted) {
-                            toast.success(`Auto-Scan Granted: ${data.plate_number}`);
-                        } else {
-                            toast.error(`Auto-Scan Denied: ${data.plate_number} (${data.access_status})`);
+                                    try {
+                                        const response = await fetch(`${API_BASE_URL}/detect`, {
+                                            method: 'POST',
+                                            body: formData
+                                            // No authorization header needed for this public endpoint based on previous specs, 
+                                            // or add if required by backend
+                                        });
+
+                                        if (response.ok) {
+                                            const data = await response.json();
+                                            if (data.detected) {
+                                                setDetectionResult(data);
+                                                
+                                                if (data.access_granted) {
+                                                    toast.success(`Granted: ${data.plate_text || data.plate_number}`);
+                                                } else {
+                                                    toast.error(`Denied: ${data.plate_text || data.plate_number}`);
+                                                }
+
+                                                // Clear result after 5s
+                                                if (clearTimer) clearTimeout(clearTimer);
+                                                clearTimer = setTimeout(() => setDetectionResult(null), 5000);
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error("Scanning error:", err);
+                                    }
+                                }, 'image/jpeg', 0.8);
+                            }
                         }
-
-                        // Clear the display after 5 seconds
-                        if (clearTimer) clearTimeout(clearTimer);
-                        clearTimer = setTimeout(() => {
-                            setDetectionResult(null);
-                        }, 5000);
-                    }
+                    }, 2000); // Scan every 2 seconds
                 }
             } catch (err) {
-                // Silently ignore polling errors so it doesn't spam console if backend is restarting
+                console.error("Error accessing camera:", err);
+                toast.error("Could not access device camera");
             }
-        }, 1500); // Poll every 1.5 seconds
+        };
+
+        startCamera();
 
         return () => {
-            clearInterval(pollInterval);
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (scanInterval) clearInterval(scanInterval);
             if (clearTimer) clearTimeout(clearTimer);
         };
-    }, [isAutoScanning]);
+    }, [selectedCamera, isAutoScanning]);
 
     return (
         <motion.div
@@ -142,11 +201,16 @@ const CameraPage = () => {
                 <div className="lg:col-span-2 space-y-6">
                     <GlassCard className="p-0 overflow-hidden relative group">
                         <div className="relative aspect-video bg-black">
+                            {/* Hidden canvas for capturing frames */}
+                            <canvas ref={canvasRef} className="hidden" />
+                            
                             {/* Camera Feed Logic */}
                             {selectedCamera === 1 ? (
-                                <img
-                                    src={`${API_BASE_URL}/live-feed`}
-                                    alt="Live Camera Feed"
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -168,12 +232,8 @@ const CameraPage = () => {
                             <div className="absolute top-4 left-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md">
                                 <div className="h-2 w-2 animate-pulse rounded-full bg-red-500"></div>
                                 <span className="text-xs font-medium text-white">
-                                    {cameras.find(c => c.id === selectedCamera)?.name}
+                                    {selectedCamera === 1 ? "Local Device Camera" : cameras.find(c => c.id === selectedCamera)?.name}
                                 </span>
-                            </div>
-
-                            <div className="absolute top-4 right-4 flex flex-col items-end gap-2 text-white/80">
-                                <span className="text-xs font-mono">{new Date().toLocaleTimeString()}</span>
                             </div>
 
                             <div className="absolute top-4 right-4 flex flex-col items-end gap-2 text-white/80">
