@@ -112,8 +112,11 @@ const CameraPage = () => {
 
                 // Start the scanning loop
                 if (isAutoScanning) {
+                    // Delay scan slightly to ensure video has started playing and dimensions are loaded
                     scanInterval = setInterval(async () => {
-                        if (videoRef.current && canvasRef.current && isStreaming) {
+                        // Fix: Avoid checking stale boolean state `isStreaming` from closure.
+                        // Instead, verify if the video has loaded frames.
+                        if (videoRef.current && videoRef.current.readyState >= 2 && canvasRef.current) {
                             const canvas = canvasRef.current;
                             const video = videoRef.current;
                             
@@ -169,8 +172,8 @@ const CameraPage = () => {
                             }
                         } else {
                              // Only toast occasionally so we don't spam
-                             if (Math.random() < 0.2) {
-                                 toast.error(`Scan skipped. Refs/Stream ready? V:${!!videoRef.current} C:${!!canvasRef.current} S:${isStreaming}`);
+                             if (Math.random() < 0.1) {
+                                 toast.error(`Scan skipped. Video not ready. ReadyState: ${videoRef.current?.readyState}`);
                              }
                         }
                     }, 2000); // Scan every 2 seconds
