@@ -128,7 +128,10 @@ const CameraPage = () => {
                                 
                                 // Convert to blob and send to backend
                                 canvas.toBlob(async (blob) => {
-                                    if (!blob) return;
+                                    if (!blob) {
+                                         toast.error("Canvas toBlob failed! Output is null.");
+                                         return;
+                                    }
                                     
                                     const formData = new FormData();
                                     formData.append('file', blob, 'frame.jpg');
@@ -165,7 +168,10 @@ const CameraPage = () => {
                                 }, 'image/jpeg', 0.8);
                             }
                         } else {
-                             // console.log("Missing refs or not streaming", { videoRef: !!videoRef.current, canvasRef: !!canvasRef.current, isStreaming });
+                             // Only toast occasionally so we don't spam
+                             if (Math.random() < 0.2) {
+                                 toast.error(`Scan skipped. Refs/Stream ready? V:${!!videoRef.current} C:${!!canvasRef.current} S:${isStreaming}`);
+                             }
                         }
                     }, 2000); // Scan every 2 seconds
                 }
