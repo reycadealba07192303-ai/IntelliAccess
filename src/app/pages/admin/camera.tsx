@@ -134,11 +134,10 @@ const CameraPage = () => {
                                     formData.append('file', blob, 'frame.jpg');
 
                                     try {
+                                        // console.log("Sending frame to", `${API_BASE_URL}/detect`);
                                         const response = await fetch(`${API_BASE_URL}/detect`, {
                                             method: 'POST',
                                             body: formData
-                                            // No authorization header needed for this public endpoint based on previous specs, 
-                                            // or add if required by backend
                                         });
 
                                         if (response.ok) {
@@ -156,12 +155,17 @@ const CameraPage = () => {
                                                 if (clearTimer) clearTimeout(clearTimer);
                                                 clearTimer = setTimeout(() => setDetectionResult(null), 5000);
                                             }
+                                        } else {
+                                             toast.error(`API Error: ${response.status}`);
                                         }
-                                    } catch (err) {
+                                    } catch (err: any) {
                                         console.error("Scanning error:", err);
+                                        toast.error(`Scanning Error: ${err.message || 'Unknown'}`);
                                     }
                                 }, 'image/jpeg', 0.8);
                             }
+                        } else {
+                             // console.log("Missing refs or not streaming", { videoRef: !!videoRef.current, canvasRef: !!canvasRef.current, isStreaming });
                         }
                     }, 2000); // Scan every 2 seconds
                 }
