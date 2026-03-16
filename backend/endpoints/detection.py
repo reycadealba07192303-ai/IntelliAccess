@@ -70,46 +70,47 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     # Draw YOLO box
                     cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
                     cv2.putText(img, f"{vehicle_type} ({conf:.2f})", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                    
-                    # --- OCR Logic (Only runs if a vehicle is detected) ---
-                    try:
-                        if reader:
-                                # detailed OCR
-                                ocr_results = reader.readtext(img, detail=1, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") 
-                                valid_texts = []
-                                for result in ocr_results:
-                                    bbox, text, ocr_conf = result
-                                    if ocr_conf > 0.3:
-                                        bx1 = int(min([pt[0] for pt in bbox]))
-                                        by1 = int(min([pt[1] for pt in bbox]))
-                                        bx2 = int(max([pt[0] for pt in bbox]))
-                                        by2 = int(max([pt[1] for pt in bbox]))
-                                        valid_texts.append({'box': (bx1, by1, bx2, by2), 'text': text})
-                                
-                                if valid_texts:
-                                    # simple left to right sort
-                                    valid_texts.sort(key=lambda item: item['box'][0])
-                                    combined_text = "".join([item['text'] for item in valid_texts])
-                                    
-                                    import re
-                                    clean_text = re.sub(r'[^A-Za-z0-9]', '', combined_text).upper()
-                                    if len(clean_text) >= 2:
-                                        plate_text = clean_text
-                                        
-                                        min_x = min([item['box'][0] for item in valid_texts])
-                                        min_y = min([item['box'][1] for item in valid_texts])
-                                        max_x = max([item['box'][2] for item in valid_texts])
-                                        max_y = max([item['box'][3] for item in valid_texts])
-                                        
-                                        cv2.rectangle(img, (min_x, min_y), (max_x, max_y), (0, 255, 0), 2)
-                                        cv2.putText(img, plate_text, (min_x, min_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 3)
-                    except Exception as ocr_e:
-                        print(f"OCR Error: {ocr_e}")
-                        plate_text = "OCR Error"
-
-                    break # Stop looking for more vehicles once we found one and tried OCR
+                    break
             if detected:
                 break
+
+        # --- OCR Logic (Runs unconditionally for plate testing) ---
+        try:
+            if reader:
+                    # detailed OCR
+                    ocr_results = reader.readtext(img, detail=1, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") 
+                    valid_texts = []
+                    for result in ocr_results:
+                        bbox, text, ocr_conf = result
+                        if ocr_conf > 0.3:
+                            bx1 = int(min([pt[0] for pt in bbox]))
+                            by1 = int(min([pt[1] for pt in bbox]))
+                            bx2 = int(max([pt[0] for pt in bbox]))
+                            by2 = int(max([pt[1] for pt in bbox]))
+                            valid_texts.append({'box': (bx1, by1, bx2, by2), 'text': text})
+                    
+                    if valid_texts:
+                        # simple left to right sort
+                        valid_texts.sort(key=lambda item: item['box'][0])
+                        combined_text = "".join([item['text'] for item in valid_texts])
+                        
+                        import re
+                        clean_text = re.sub(r'[^A-Z0-9]', '', combined_text).upper()
+                        # Require at least 4 characters for a plate number
+                        if len(clean_text) >= 4:
+                            plate_text = clean_text
+                            detected = True # Force detection if we read a plate
+                            
+                            min_x = min([item['box'][0] for item in valid_texts])
+                            min_y = min([item['box'][1] for item in valid_texts])
+                            max_x = max([item['box'][2] for item in valid_texts])
+                            max_y = max([item['box'][3] for item in valid_texts])
+                            
+                            cv2.rectangle(img, (min_x, min_y), (max_x, max_y), (0, 255, 0), 2)
+                            cv2.putText(img, plate_text, (min_x, min_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 3)
+        except Exception as ocr_e:
+            print(f"OCR Error: {ocr_e}")
+            plate_text = "OCR Error"
 
         # --- Access Logic & Database Integration ---
         access_granted = False
