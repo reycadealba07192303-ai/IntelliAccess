@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # Environments
 .env
@@ -10,3 +11,12 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# AI Captures
+static/captures/
+
+# Test files
+test_*.py
+debug_*.py
+update_phone.py
+dummy_plate.jpg

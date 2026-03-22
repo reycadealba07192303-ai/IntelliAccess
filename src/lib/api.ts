@@ -1,7 +1,17 @@
 // lib/api.ts
-// In production, use the environment variable (e.g. your Render URL). 
-// In local development, dynamically use the current host so that local network devices (like phones) can access the backend.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
+// In production, use VITE_API_URL (Render, etc.).
+// For fast local development, prefer local backend settings:
+// - VITE_USE_LOCAL_API=true (force local)
+// - VITE_LOCAL_API_URL=http://localhost:8000 (optional custom local URL)
+// Default is http://<current-hostname>:8000
+const DEFAULT_LOCAL_API_URL = `http://${window.location.hostname}:8000`;
+
+const shouldUseLocal = import.meta.env.VITE_USE_LOCAL_API === 'true';
+const localUrl = import.meta.env.VITE_LOCAL_API_URL || DEFAULT_LOCAL_API_URL;
+
+export const API_BASE_URL =
+  shouldUseLocal ? localUrl :
+  import.meta.env.VITE_API_URL || localUrl;
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     // Get token from localStorage (assuming we store it there on login)

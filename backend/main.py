@@ -7,7 +7,7 @@ import sys
 import os
 # Add the current directory to sys.path locally
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream
+from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream, detection, camera_server
 
 load_dotenv()
 
@@ -46,7 +46,8 @@ app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(vehicles.router, prefix="/vehicles", tags=["Vehicles"])
 app.include_router(logs.router, prefix="/logs", tags=["Access Logs"])
 app.include_router(stream.router, tags=["Camera Stream"])
-# app.include_router(detection.router, tags=["AI Detection"])
+app.include_router(detection.router, tags=["AI Detection"])
+app.include_router(camera_server.router, prefix="/camera-server", tags=["Backend Cameras"])
 app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 app.include_router(stats.router, prefix="/stats", tags=["Statistics"])
 app.include_router(cameras.router, prefix="/cameras", tags=["Cameras"])

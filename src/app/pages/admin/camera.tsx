@@ -17,7 +17,12 @@ const CameraPage = () => {
     const [selectedCamera, setSelectedCamera] = useState<number>(1);
     const [detectionResult, setDetectionResult] = useState<any>(null);
     const [isAutoScanning, setIsAutoScanning] = useState(true); // Default to AI auto-scan on
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'found' | 'empty'>('idle');
+    const [scanCount, setScanCount] = useState(0);
     const lastScanTimeRef = useRef<number>(0);
+    const lastScanStatusRef = useRef<'idle' | 'granted' | 'denied'>('idle');
 
     const [cameras, setCameras] = useState<any[]>([]);
     const [isAddingCamera, setIsAddingCamera] = useState(false);
@@ -85,12 +90,31 @@ const CameraPage = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isStreaming, setIsStreaming] = useState(false);
+    const scanningRef = useRef(false);
+
+    const SCAN_INTERVAL_MS = 1000; // Tick every 1 second to check if a capture is needed
+    // MIN_CAPTURE_GAP_MS is dynamically decided in the loop now based on last result
+    const ROI = {
+        left: 0.2,
+        top: 0.3,
+        width: 0.6,
+        height: 0.4,
+    };
+
+    const plateOverlay = detectionResult?.plate_box ? {
+        left: `${(ROI.left + detectionResult.plate_box.x * ROI.width) * 100}%`,
+        top: `${(ROI.top + detectionResult.plate_box.y * ROI.height) * 100}%`,
+        width: `${detectionResult.plate_box.w * ROI.width * 100}%`,
+        height: `${detectionResult.plate_box.h * ROI.height * 100}%`,
+        label: `${detectionResult.plate_number || 'PLATE'} (${(detectionResult.confidence || 0).toFixed(1)}%)`,
+    } : null;
 
     // --- Client-Side Camera & AI Scanning ---
     useEffect(() => {
         let stream: MediaStream | null = null;
         let scanInterval: NodeJS.Timeout;
         let clearTimer: NodeJS.Timeout;
+        let isMounted = true;
 
         const startCamera = async () => {
             if (selectedCamera !== 1) {
@@ -103,8 +127,18 @@ const CameraPage = () => {
 
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } // Prefer back camera on mobile
+                    video: { 
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        facingMode: { ideal: 'environment' } // Prefer back camera on mobile, fallback safely on laptops
+                    } 
                 });
+                if (!isMounted) {
+                    // If component unmounted while we were waiting for camera, stop tracks and exit
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     setIsStreaming(true);
@@ -114,79 +148,143 @@ const CameraPage = () => {
                 if (isAutoScanning) {
                     // Delay scan slightly to ensure video has started playing and dimensions are loaded
                     scanInterval = setInterval(async () => {
-                        // Fix: Avoid checking stale boolean state `isStreaming` from closure.
-                        // Instead, verify if the video has loaded frames.
-                        if (videoRef.current && videoRef.current.readyState >= 2 && canvasRef.current) {
-                            const canvas = canvasRef.current;
-                            const video = videoRef.current;
-                            
-                            // Set canvas dimensions to match video
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
-                            
-                            const ctx = canvas.getContext('2d');
-                            if (ctx) {
-                                // Draw current video frame to canvas
-                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                // Convert to blob and send to backend
-                                canvas.toBlob(async (blob) => {
-                                    if (!blob) {
-                                         toast.error("Canvas toBlob failed! Output is null.");
-                                         return;
-                                    }
-                                    
-                                    const formData = new FormData();
-                                    formData.append('file', blob, 'frame.jpg');
+                        if (!videoRef.current || !canvasRef.current || videoRef.current.readyState < 2 || scanningRef.current) return;
 
-                                    try {
-                                        // console.log("Sending frame to", `${API_BASE_URL}/detect`);
-                                        const response = await fetch(`${API_BASE_URL}/detect`, {
-                                            method: 'POST',
-                                            body: formData
-                                        });
-
-                                        if (response.ok) {
-                                            const data = await response.json();
-                                            if (data.detected) {
-                                                setDetectionResult(data);
-                                                
-                                                if (data.access_granted) {
-                                                    toast.success(`Granted: ${data.plate_text || data.plate_number}`);
-                                                } else {
-                                                    toast.error(`Denied: ${data.plate_text || data.plate_number}`);
-                                                }
-
-                                                // Clear result after 5s
-                                                if (clearTimer) clearTimeout(clearTimer);
-                                                clearTimer = setTimeout(() => setDetectionResult(null), 5000);
-                                            }
-                                        } else {
-                                             toast.error(`API Error: ${response.status}`);
-                                        }
-                                    } catch (err: any) {
-                                        console.error("Scanning error:", err);
-                                        toast.error(`Scanning Error: ${err.message || 'Unknown'}`);
-                                    }
-                                }, 'image/jpeg', 0.8);
-                            }
-                        } else {
-                             // Only toast occasionally so we don't spam
-                             if (Math.random() < 0.1) {
-                                 toast.error(`Scan skipped. Video not ready. ReadyState: ${videoRef.current?.readyState}`);
-                             }
+                        const now = Date.now();
+                        
+                        // Dynamic capture gap logic
+                        let requiredGap = 4000; // Default 4 seconds gap
+                        if (lastScanStatusRef.current === 'denied') {
+                            requiredGap = 2000; // Fast 2-second retry if denied/misread
+                        } else if (lastScanStatusRef.current === 'granted') {
+                            requiredGap = 5000; // 5-second pause if granted
                         }
-                    }, 2000); // Scan every 2 seconds
+
+                        if (now - lastScanTimeRef.current < requiredGap) {
+                            return;
+                        }
+
+                        scanningRef.current = true;
+                        setScanStatus('scanning');
+                        lastScanTimeRef.current = now;
+
+                        const canvas = canvasRef.current;
+                        const video = videoRef.current;
+                        
+                        const vW = video.videoWidth;
+                        const vH = video.videoHeight;
+                        
+                        const sx = Math.round(vW * ROI.left);
+                        const sy = Math.round(vH * ROI.top);
+                        const sWidth = Math.round(vW * ROI.width);
+                        const sHeight = Math.round(vH * ROI.height);
+                        
+                        canvas.width = sWidth;
+                        canvas.height = sHeight;
+                        
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            // Draw only the target overlay crop (plate window) to the canvas
+                            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                            
+                            // Convert to blob and send to backend
+                            canvas.toBlob(async (blob) => {
+                                if (!blob || !isMounted) {
+                                    scanningRef.current = false;
+                                    return;
+                                }
+                                
+                                const formData = new FormData();
+                                formData.append('file', blob, 'frame.jpg');
+
+                                try {
+                                    const response = await fetch(`${API_BASE_URL}/detect`, {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+
+                                    if (!response.ok) {
+                                        console.error("Detection endpoint error", response.status);
+                                        return;
+                                    }
+
+                                    const data = await response.json();
+                                    
+                                    // Only trigger UI if backend detected a REAL plate number
+                                    // (data.detected can be true for vehicle body alone, without a plate read)
+                                    const hasRealPlate = data.detected && 
+                                        data.plate_number && 
+                                        data.plate_number !== "Not Detected" && 
+                                        data.plate_number !== "OCR Error" &&
+                                        data.plate_number.length >= 4;
+
+                                    if (hasRealPlate) {
+                                        setScanStatus('found');
+                                        setScanCount(c => c + 1);
+
+                                        // 2. Perform the exact "Capture" blink flash
+                                        setIsCapturing(true);
+                                        setTimeout(() => {
+                                            if (isMounted) setIsCapturing(false);
+                                        }, 150);
+
+                                        // 3. Show Results Panel
+                                        setIsProcessing(false);
+                                        setDetectionResult(data);
+                                        
+                                        lastScanStatusRef.current = data.access_granted ? 'granted' : 'denied';
+
+                                        if (data.access_granted) {
+                                            toast.success(`Granted: ${data.plate_text || data.plate_number}`);
+                                        } else {
+                                            toast.error(`Denied: ${data.plate_text || data.plate_number}`);
+                                        }
+
+                                        // 4. Panel stays for 5 seconds, then clears
+                                        if (clearTimer) clearTimeout(clearTimer);
+                                        clearTimer = setTimeout(() => {
+                                            if (isMounted) setDetectionResult(null);
+                                        }, 5000);
+                                        
+                                        // Set status so 'finally' block doesn't revert to empty
+                                        setScanStatus('idle');
+                                        return;
+                                    }
+                                } catch (err: any) {
+                                    console.error("Scanning error:", err);
+                                    setScanStatus('idle');
+                                } finally {
+                                    if (isMounted) {
+                                        // If we completed a successful scan, scanStatus is likely 'idle' or 'found'. 
+                                        // Only show 'empty' if we actually failed to find a plate in the current scan.
+                                        if (scanStatus === 'scanning') {
+                                            if (lastScanStatusRef.current !== 'granted' && lastScanStatusRef.current !== 'denied') {
+                                                lastScanStatusRef.current = 'idle';
+                                            }
+                                            setScanStatus('empty');
+                                            setTimeout(() => setScanStatus(s => s === 'empty' ? 'idle' : s), 1500);
+                                        }
+                                        scanningRef.current = false;
+                                    }
+                                }
+                            }, 'image/jpeg', 0.85);
+                        } else {
+                            scanningRef.current = false;
+                        }
+                    }, SCAN_INTERVAL_MS);
                 }
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                toast.error("Could not access device camera");
+                if (isMounted) {
+                    toast.error("Could not access device camera");
+                }
             }
         };
 
         startCamera();
 
         return () => {
+            isMounted = false;
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
@@ -219,13 +317,62 @@ const CameraPage = () => {
                             
                             {/* Camera Feed Logic */}
                             {selectedCamera === 1 ? (
-                                <video
-                                    ref={videoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    className="w-full h-full object-cover"
-                                />
+                                <>
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className="w-full h-full object-cover"
+                                    />
+                                    {/* Capture Flash Effect */}
+                                    <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
+                                    
+                                    {/* Scanning Target Box with Live Status */}
+                                    {isAutoScanning && (
+                                         <div className={`absolute top-[30%] bottom-[30%] left-[20%] right-[20%] border-2 border-dashed rounded-xl pointer-events-none flex flex-col items-center justify-center transition-colors duration-300 ${
+                                            scanStatus === 'scanning' ? 'border-amber-400/60 bg-amber-500/10 shadow-[0_0_20px_rgba(251,191,36,0.2)_inset]' :
+                                            scanStatus === 'found' ? 'border-emerald-500 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)_inset] scale-[1.02]' :
+                                            scanStatus === 'empty' ? 'border-red-400/60 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.2)_inset]' :
+                                            'border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.2)_inset]'
+                                         }`}>
+                                             
+                                             <div className="absolute -top-3 px-3 py-1 bg-black/80 text-white text-[10px] font-mono tracking-widest rounded-full border border-white/20 whitespace-nowrap">
+                                                {scanStatus === 'scanning' ? `SCANNING FRAME #${scanCount + 1}...` :
+                                                 scanStatus === 'found' ? `PLATE DETECTED ✓` :
+                                                 scanStatus === 'empty' ? `NO PLATE DETECTED` :
+                                                 `POSITION PLATE HERE`}
+                                             </div>
+                                             
+                                             <span className={`font-bold tracking-widest text-xs px-4 py-1.5 rounded-full border transition-all duration-300 ${
+                                                scanStatus === 'scanning' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(251,191,36,0.5)]' :
+                                                scanStatus === 'found' ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-110' :
+                                                scanStatus === 'empty' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                                'bg-black/60 text-emerald-400 border-emerald-500/30'
+                                             }`}>
+                                                {scanStatus === 'scanning' ? 'ANALYZING...' :
+                                                 scanStatus === 'found' ? 'SUCCESS' :
+                                                 scanStatus === 'empty' ? 'RETRYING' :
+                                                 'AI READY'}
+                                             </span>
+                                         </div>
+                                    )}
+
+                                    {/* Live OCR boxes (from last detected plate) */}
+                                    {plateOverlay && (
+                                        <div className="absolute border-2 border-lime-400/80 rounded-md pointer-events-none" style={{
+                                            left: plateOverlay.left,
+                                            top: plateOverlay.top,
+                                            width: plateOverlay.width,
+                                            height: plateOverlay.height,
+                                            boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.5)',
+                                        }}>
+                                            <div className="absolute -top-6 left-0 bg-lime-500/90 text-black text-xs px-2 py-0.5 rounded-sm">
+                                                {plateOverlay.label}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="relative w-full h-full">
                                     <img
@@ -275,51 +422,84 @@ const CameraPage = () => {
                         </div>
                     </GlassCard>
 
-                    {/* Scanning Results Panel */}
-                    {(detectionResult) && (
+                    {/* Scanning Results Panel - More Prominent */}
+                    {(detectionResult || isProcessing) && (
                         <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="lg:col-span-2"
                         >
-                            <GlassCard className="p-4 border-l-4 overflow-hidden relative">
-                                {detectionResult && (
-                                    <div className={`flex items-center justify-between relative z-10 ${detectionResult.access_granted ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-xl ${detectionResult.access_granted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                {detectionResult.access_granted ? <CheckCircle2 className="h-8 w-8" /> : <XCircle className="h-8 w-8" />}
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white tracking-widest">
-                                                    {detectionResult.plate_number || "NO PLATE"}
-                                                </h3>
-                                                <p className={`text-sm font-medium mt-1 ${detectionResult.access_granted ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    {detectionResult.access_status}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6">
-                                            {detectionResult.vehicle_info && (
-                                                <div className="text-right text-sm text-slate-400 border-l border-white/10 pl-6 space-y-1">
-                                                    <p>Owner: <span className="text-white">{detectionResult.vehicle_info.owner_name || detectionResult.vehicle_info.owner_id || "Unknown"}</span></p>
-                                                    <p>Role: <span className="text-white">{detectionResult.vehicle_info.owner_role || "Unknown"}</span></p>
-                                                    <p>Vehicle: <span className="text-white">{detectionResult.vehicle_info.color} {detectionResult.vehicle_info.model}</span></p>
+                            <GlassCard className={`p-6 border-l-4 overflow-hidden relative ${
+                                isProcessing ? 'border-l-blue-500 bg-blue-500/5' :
+                                detectionResult?.access_granted ? 'border-l-emerald-500 bg-emerald-500/5' : 'border-l-red-500 bg-red-500/5'
+                            }`}>
+                                {isProcessing ? (
+                                    <div className="flex flex-col items-center justify-center py-8">
+                                        <motion.div
+                                            animate={{ rotate: 360 }}
+                                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                            className="h-12 w-12 border-4 border-blue-500/30 border-t-blue-400 rounded-full mb-4"
+                                        />
+                                        <p className="text-slate-300 font-medium">Analyzing plate...</p>
+                                        <p className="text-xs text-slate-500 mt-2">Processing detection result</p>
+                                    </div>
+                                ) : detectionResult ? (
+                                    <div className="space-y-4">
+                                        {/* Top Section: Status & Plate */}
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-start gap-4 flex-1">
+                                                <div className={`p-4 rounded-xl ${detectionResult.access_granted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                    {detectionResult.access_granted ? <CheckCircle2 className="h-8 w-8" /> : <XCircle className="h-8 w-8" />}
                                                 </div>
-                                            )}
-                                            {!detectionResult.vehicle_info && detectionResult.detected && (
-                                                <div className="text-right text-sm text-slate-400 border-l border-white/10 pl-6">
-                                                    <p>Confidence: <span className="text-white">{(detectionResult.confidence * 100 || 95).toFixed(1)}%</span></p>
-                                                    <p>Type: <span className="text-white">{detectionResult.vehicle_type || "Vehicle"}</span></p>
+                                                <div className="flex-1">
+                                                    <h3 className="text-3xl font-bold text-white tracking-widest mb-2">
+                                                        {detectionResult.plate_number || "NO PLATE"}
+                                                    </h3>
+                                                    <p className={`text-lg font-semibold ${detectionResult.access_granted ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                        {detectionResult.access_status}
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 mt-2">
+                                                        Confidence: <span className="text-white font-medium">{(detectionResult.confidence || 95).toFixed(1)}%</span>
+                                                    </p>
                                                 </div>
-                                            )}
+                                            </div>
+                                            
+                                            {/* Captured Image - Large */}
                                             {detectionResult.image_url && (
-                                                <div className="h-16 w-24 overflow-hidden rounded-lg border border-white/20 shrink-0 shadow-lg">
+                                                <div className="h-32 w-40 overflow-hidden rounded-lg border-2 border-white/20 shrink-0 shadow-lg">
                                                     <img src={`${API_BASE_URL}${detectionResult.image_url}`} alt="Captured" className="h-full w-full object-cover" />
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Vehicle Info Section */}
+                                        {detectionResult.vehicle_info && (
+                                            <div className="border-t border-white/10 pt-4">
+                                                <h4 className="text-sm font-semibold text-slate-300 mb-3">Vehicle Information</h4>
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div>
+                                                        <p className="text-slate-500">Owner</p>
+                                                        <p className="text-white font-medium">{detectionResult.vehicle_info.owner_name || "Unknown"}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-500">Role</p>
+                                                        <p className="text-white font-medium">{detectionResult.vehicle_info.owner_role || "Unknown"}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-500">Vehicle</p>
+                                                        <p className="text-white font-medium">{detectionResult.vehicle_info.color} {detectionResult.vehicle_info.model}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-500">Type</p>
+                                                        <p className="text-white font-medium">{detectionResult.vehicle_type || "Vehicle"}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                ) : null}
                             </GlassCard>
                         </motion.div>
                     )}

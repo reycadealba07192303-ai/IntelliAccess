@@ -6,8 +6,8 @@ from mongo_client import notifications_collection
 
 router = APIRouter()
 
-@router.get("/")
-async def get_all_notifications(limit: int = 20, offset: int = 0, target_user_id: Optional[str] = None, user = Depends(get_current_user)):
+@router.get("")
+def get_all_notifications(limit: int = 20, offset: int = 0, target_user_id: Optional[str] = None, user = Depends(get_current_user)):
     """Admin route to get all system notifications"""
     try:
         # Check if admin (optional depending on how strict we want to be)
@@ -43,7 +43,7 @@ async def get_all_notifications(limit: int = 20, offset: int = 0, target_user_id
          raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/me")
-async def get_my_notifications(limit: int = 20, offset: int = 0, user = Depends(get_current_user)):
+def get_my_notifications(limit: int = 20, offset: int = 0, user = Depends(get_current_user)):
     """User route to get personal and system notifications"""
     try:
         # Get notifications specific to this user only
@@ -75,7 +75,7 @@ async def get_my_notifications(limit: int = 20, offset: int = 0, user = Depends(
          raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/mark-all-read")
-async def mark_all_read(user = Depends(get_current_user)):
+def mark_all_read(user = Depends(get_current_user)):
     try:
         query = {
             "user_id": user["id"]
@@ -87,7 +87,7 @@ async def mark_all_read(user = Depends(get_current_user)):
          raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{notification_id}/read")
-async def mark_notification_read(notification_id: str, user = Depends(get_current_user)):
+def mark_notification_read(notification_id: str, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         # Set read to true
@@ -100,7 +100,7 @@ async def mark_notification_read(notification_id: str, user = Depends(get_curren
          raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{notification_id}")
-async def delete_notification(notification_id: str, user = Depends(get_current_user)):
+def delete_notification(notification_id: str, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         notifications_collection.delete_one({"_id": ObjectId(notification_id)})

@@ -14,8 +14,8 @@ class VehicleCreate(BaseModel):
     body_type: Optional[str] = None
     owner_id: Optional[str] = None
 
-@router.post("/")
-async def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user)):
+@router.post("")
+def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user)):
     try:
         vehicle_dict = vehicle.dict(exclude_unset=True)
         vehicle_dict["status"] = "Active"
@@ -48,7 +48,7 @@ async def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/verify")
-async def verify_vehicle(plate_number: str):
+def verify_vehicle(plate_number: str):
     try:
         vehicle = vehicles_collection.find_one({"plate_number": plate_number})
         if vehicle:
@@ -60,8 +60,8 @@ async def verify_vehicle(plate_number: str):
     except Exception as e:
          return {"status": "error", "message": str(e)}
 
-@router.get("/")
-async def get_vehicles(user = Depends(get_current_user)):
+@router.get("")
+def get_vehicles(user = Depends(get_current_user)):
     try:
         user_id = user.get("id") if user else None
         role = user.get("role", "").upper() if user else ""
@@ -107,7 +107,7 @@ class VehicleUpdate(BaseModel):
     color: Optional[str] = None
 
 @router.put("/{vehicle_id}")
-async def update_vehicle(vehicle_id: str, vehicle_update: VehicleUpdate, user = Depends(get_current_user)):
+def update_vehicle(vehicle_id: str, vehicle_update: VehicleUpdate, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         vehicle_doc = vehicles_collection.find_one({"_id": ObjectId(vehicle_id)})
@@ -138,7 +138,7 @@ async def update_vehicle(vehicle_id: str, vehicle_update: VehicleUpdate, user = 
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{vehicle_id}")
-async def delete_vehicle(vehicle_id: str, user = Depends(get_current_user)):
+def delete_vehicle(vehicle_id: str, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         vehicle_doc = vehicles_collection.find_one({"_id": ObjectId(vehicle_id)})

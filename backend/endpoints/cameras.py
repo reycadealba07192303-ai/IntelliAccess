@@ -13,8 +13,8 @@ class CameraModel(BaseModel):
 
 router = APIRouter()
 
-@router.get("/")
-async def get_all_cameras(user = Depends(get_current_user)):
+@router.get("")
+def get_all_cameras(user = Depends(get_current_user)):
     """Get all camera feeds configured in the system"""
     try:
         cursor = cameras_collection.find().sort("id", 1)
@@ -40,8 +40,8 @@ async def get_all_cameras(user = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/")
-async def add_camera(camera: CameraModel, user = Depends(get_current_user)):
+@router.post("")
+def add_camera(camera: CameraModel, user = Depends(get_current_user)):
     try:
         # Determine the next int ID (although MongoDB uses _id, the frontend currently expects 'id')
         highest_cam = cameras_collection.find_one(sort=[("id", -1)])
@@ -64,7 +64,7 @@ async def add_camera(camera: CameraModel, user = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{camera_id}")
-async def delete_camera(camera_id: str, user = Depends(get_current_user)):
+def delete_camera(camera_id: str, user = Depends(get_current_user)):
     try:
         result = cameras_collection.delete_one({"_id": ObjectId(camera_id)})
         if result.deleted_count == 0:

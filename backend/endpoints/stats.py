@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 
-@router.get("/")
-async def get_admin_stats(user = Depends(get_current_user)):
+@router.get("")
+def get_admin_stats(user = Depends(get_current_user)):
     try:
         # Require admin access for dashboard stats
         if user.get("role") != "admin" and user.get("role") != "ADMIN":

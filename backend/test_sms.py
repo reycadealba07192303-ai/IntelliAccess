@@ -16,7 +16,7 @@ if __name__ == "__main__":
     
     # PUT YOUR OWN PHONE NUMBER HERE FOR TESTING
     test_number = "09916024734" 
-    test_owner = "Jazmine Isabelle L. Guban"
+    test_owner = "Jomarie Briones"
     test_plate = "ABY 8512"
     current_time_str = datetime.now().strftime("%I:%M %p")
     

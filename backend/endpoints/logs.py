@@ -16,8 +16,8 @@ class AccessLogCreate(BaseModel):
     status: str
     gate: str
 
-@router.post("/")
-async def create_log(log: AccessLogCreate):
+@router.post("")
+def create_log(log: AccessLogCreate):
     try:
         log_data = log.dict()
         log_data["timestamp"] = datetime.utcnow().isoformat()
@@ -46,11 +46,11 @@ async def create_log(log: AccessLogCreate):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/")
-async def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = None, user = Depends(get_current_user)):
+@router.get("")
+def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = None, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
-        from mongo_client import vehicles_collection, users_collection
+        from mongo_client import vehicles_collection, users_collection, denied_logs_collection
         import pymongo
         
         query = {}
@@ -67,12 +67,16 @@ async def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = N
                     ]
                 }
             else:
-                # User has no vehicles, so no log matches
                 query = {"_id": "none"}
         
-        cursor = access_logs_collection.find(query).sort("timestamp", pymongo.DESCENDING).skip(offset).limit(limit)
-        logs = []
-        for l in cursor:
+        # Fetch from BOTH access_logs (granted) and denied_logs (denied)
+        granted_cursor = access_logs_collection.find(query).sort("timestamp", pymongo.DESCENDING).limit(limit * 2)
+        denied_cursor = denied_logs_collection.find(query if not owner_id else {}).sort("timestamp", pymongo.DESCENDING).limit(limit * 2)
+        
+        all_logs = []
+        
+        # Process granted logs
+        for l in granted_cursor:
             l["id"] = str(l["_id"])
             del l["_id"]
             l["created_at"] = l.get("timestamp")
@@ -92,13 +96,43 @@ async def get_logs(limit: int = 10, offset: int = 0, owner_id: Optional[str] = N
                         except:
                             pass
                     l["vehicle"] = v_info
-            logs.append(l)
-        return logs
+            all_logs.append(l)
+        
+        # Process denied logs
+        for l in denied_cursor:
+            l["id"] = str(l["_id"])
+            del l["_id"]
+            l["created_at"] = l.get("timestamp")
+            
+            # Try to enrich denied logs with vehicle info if available
+            if l.get("vehicle_id"):
+                try:
+                    v = vehicles_collection.find_one({"_id": ObjectId(l["vehicle_id"])})
+                    if v:
+                        v_info = {"model": v.get("model", "Unknown")}
+                        if v.get("owner_id"):
+                            try:
+                                u = users_collection.find_one({"_id": ObjectId(v["owner_id"])})
+                                if u:
+                                    v_info["owner"] = {
+                                        "full_name": u.get("name", "Unknown"),
+                                        "role": u.get("role", "GUEST")
+                                    }
+                            except:
+                                pass
+                        l["vehicle"] = v_info
+                except:
+                    pass
+            all_logs.append(l)
+        
+        # Sort all merged logs by timestamp descending and apply limit/offset
+        all_logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return all_logs[offset:offset + limit]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/me")
-async def get_my_logs(limit: int = 10, offset: int = 0, user = Depends(get_current_user)):
+def get_my_logs(limit: int = 10, offset: int = 0, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         from mongo_client import vehicles_collection

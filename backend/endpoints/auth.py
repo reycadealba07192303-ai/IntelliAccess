@@ -44,7 +44,7 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(authorization: str = Header(None)):
+def get_current_user(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization Header")
     
@@ -69,7 +69,7 @@ async def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail=f"Invalid Token: {str(e)}")
 
 @router.post("/signup")
-async def signup(request: SignUpRequest):
+def signup(request: SignUpRequest):
     existing_user = users_collection.find_one({"email": request.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -102,7 +102,7 @@ async def signup(request: SignUpRequest):
     return {"access_token": access_token, "token_type": "bearer", "user": user_out}
 
 @router.post("/login")
-async def login(request: LoginRequest):
+def login(request: LoginRequest):
     user = users_collection.find_one({"email": request.email})
     
     if not user:
@@ -129,7 +129,7 @@ async def login(request: LoginRequest):
     return {"access_token": access_token, "token_type": "bearer", "user": user_out}
 
 @router.get("/me")
-async def read_users_me(user = Depends(get_current_user)):
+def read_users_me(user = Depends(get_current_user)):
     return {"user": user}
 
 class UserUpdate(BaseModel):
@@ -140,17 +140,16 @@ class UserUpdate(BaseModel):
 from fastapi import Request
 
 @router.put("/update_profile")
-async def update_profile(request: Request, user = Depends(get_current_user)):
+def update_profile(data: UserUpdate, user = Depends(get_current_user)):
     try:
-        data = await request.json()
         update_fields = {}
         
-        if "name" in data and data["name"] is not None:
-             update_fields["name"] = data["name"]
-        if "phone" in data and data["phone"] is not None:
-             update_fields["phone"] = data["phone"]
-        if "profile_url" in data and data["profile_url"] is not None:
-             update_fields["profile_url"] = data["profile_url"]
+        if data.name is not None:
+             update_fields["name"] = data.name
+        if data.phone is not None:
+             update_fields["phone"] = data.phone
+        if data.profile_url is not None:
+             update_fields["profile_url"] = data.profile_url
              
         if update_fields:
             users_collection.update_one({"_id": ObjectId(user["id"])}, {"$set": update_fields})
@@ -173,7 +172,7 @@ import shutil
 import uuid
 
 @router.post("/upload_profile_picture")
-async def upload_profile_picture(file: UploadFile = File(...), user = Depends(get_current_user)):
+def upload_profile_picture(file: UploadFile = File(...), user = Depends(get_current_user)):
     try:
         # Generate unique filename to avoid caching issues
         ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
@@ -204,7 +203,7 @@ async def upload_profile_picture(file: UploadFile = File(...), user = Depends(ge
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/users")
-async def get_all_users(user = Depends(get_current_user)):
+def get_all_users(user = Depends(get_current_user)):
     try:
         users_cursor = users_collection.find({})
         users = []
@@ -223,7 +222,7 @@ class AdminUserUpdate(BaseModel):
     role: str = None
 
 @router.put("/users/{user_id}")
-async def admin_update_user(user_id: str, update_data: AdminUserUpdate, user = Depends(get_current_user)):
+def admin_update_user(user_id: str, update_data: AdminUserUpdate, user = Depends(get_current_user)):
     try:
         update_fields = {}
         if update_data.name is not None:
@@ -249,7 +248,7 @@ async def admin_update_user(user_id: str, update_data: AdminUserUpdate, user = D
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/users/{user_id}")
-async def admin_delete_user(user_id: str, user = Depends(get_current_user)):
+def admin_delete_user(user_id: str, user = Depends(get_current_user)):
     try:
         user_doc = users_collection.find_one({"_id": ObjectId(user_id)})
         user_name = user_doc.get("name") if user_doc else "A user"
