@@ -9,6 +9,13 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream, detection, camera_server
 
+try:
+    from endpoints import rfid
+    RFID_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: RFID module not available: {e}")
+    RFID_AVAILABLE = False
+
 load_dotenv()
 
 app = FastAPI()
@@ -51,6 +58,9 @@ app.include_router(camera_server.router, prefix="/camera-server", tags=["Backend
 app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 app.include_router(stats.router, prefix="/stats", tags=["Statistics"])
 app.include_router(cameras.router, prefix="/cameras", tags=["Cameras"])
+
+if RFID_AVAILABLE:
+    app.include_router(rfid.router, prefix="/rfid", tags=["RFID"])
 
 @app.get("/")
 def read_root():

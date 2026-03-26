@@ -8,10 +8,18 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 import threading
 import cv2
+import numpy as np
 import time
 from datetime import datetime
 import os
 import json
+
+try:
+    from picamera import PiCamera
+    PICAMERA_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: picamera not available: {e}")
+    PICAMERA_AVAILABLE = False
 
 router = APIRouter()
 
@@ -69,26 +77,50 @@ class CameraManager:
         cap = None
         try:
             source = self.cameras[camera_id]["source"]
-            cap = cv2.VideoCapture(source)
-            
-            if not cap.isOpened():
-                print(f"[ERROR] Could not open camera {camera_id} from source {source}")
-                return
-            
-            print(f"[CAMERA] Opened {camera_id} - scanning started")
+            if source == 0 and PICAMERA_AVAILABLE:
+                cap = PiCamera()
+                cap.resolution = (640, 480)
+                cap.start_preview()
+                time.sleep(2)  # warmup
+                print(f"[CAMERA] Opened PiCamera {camera_id} - scanning started")
+            else:
+                cap = cv2.VideoCapture(source)
+                if not cap.isOpened():
+                    print(f"[ERROR] Could not open camera {camera_id} from source {source}")
+                    return
+                print(f"[CAMERA] Opened {camera_id} - scanning started")
             
             while self.cameras[camera_id]["active"]:
-                ret, frame = cap.read()
+                if hasattr(cap, 'capture'):
+                    # PiCamera
+                    frame = np.empty((480, 640, 3), dtype=np.uint8)
+                    try:
+                        cap.capture(frame, format='bgr')
+                        ret = True
+                    except Exception as e:
+                        print(f"[WARNING] Failed to capture from PiCamera {camera_id}: {e}")
+                        ret = False
+                else:
+                    # VideoCapture
+                    ret, frame = cap.read()
                 
                 if not ret:
                     print(f"[WARNING] Failed to read from {camera_id}, reconnecting...")
-                    cap.release()
+                    if hasattr(cap, 'release'):
+                        cap.release()
                     time.sleep(2)
-                    cap = cv2.VideoCapture(source)
+                    if source == 0 and PICAMERA_AVAILABLE:
+                        cap = PiCamera()
+                        cap.resolution = (640, 480)
+                        cap.start_preview()
+                        time.sleep(2)
+                    else:
+                        cap = cv2.VideoCapture(source)
                     continue
                 
-                # Resize for faster processing
-                frame = cv2.resize(frame, (640, 480))
+                # Resize for faster processing (already 640x480 for PiCamera)
+                if not hasattr(cap, 'capture'):
+                    frame = cv2.resize(frame, (640, 480))
                 
                 # Run detection every 30 frames (throttle)
                 if self.cameras[camera_id]["frame_count"] % 30 == 0:

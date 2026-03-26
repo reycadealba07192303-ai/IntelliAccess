@@ -28,6 +28,13 @@ except Exception as e:
     OCR_AVAILABLE = False
 
 try:
+    from picamera import PiCamera
+    PICAMERA_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: 'picamera' failed to load: {e}. Raspberry Pi camera disabled.")
+    PICAMERA_AVAILABLE = False
+
+try:
     from mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
     DB_AVAILABLE = True
 except ImportError:
@@ -268,20 +275,32 @@ def get_camera():
         return None
         
     if camera is None:
-        # 0 is usually the default webcam
-        try:
-            print("Trying to open VideoCapture(0)")
-            camera = cv2.VideoCapture(0)
-            if camera.isOpened():
-                print("Camera is opened! Warming up...")
-            else:
-                print("Camera failed to open!")
-            # Warmup
-            time.sleep(2)
-            print("Camera warmup complete")
-        except Exception as e:
-            print(f"Error opening camera: {e}")
-            camera = None
+        if PICAMERA_AVAILABLE:
+            try:
+                print("Trying to initialize Raspberry Pi camera")
+                camera = PiCamera()
+                camera.resolution = (640, 480)
+                camera.start_preview()
+                time.sleep(2)
+                print("PiCamera initialized and warmed up")
+            except Exception as e:
+                print(f"Error initializing PiCamera: {e}")
+                camera = None
+        else:
+            # Fallback to webcam
+            try:
+                print("Trying to open VideoCapture(0)")
+                camera = cv2.VideoCapture(0)
+                if camera.isOpened():
+                    print("Camera is opened! Warming up...")
+                else:
+                    print("Camera failed to open!")
+                # Warmup
+                time.sleep(2)
+                print("Camera warmup complete")
+            except Exception as e:
+                print(f"Error opening camera: {e}")
+                camera = None
     return camera
 
 def generate_frames():
@@ -298,7 +317,7 @@ def generate_frames():
     
     cam = get_camera()
     
-    if cam is None or not cam.isOpened():
+    if cam is None or (hasattr(cam, 'isOpened') and not cam.isOpened()):
          # Yield a placeholder or error frame
         yield (b'--frame\r\n'
                b'Content-Type: text/plain\r\n\r\n' + b'Camera not available' + b'\r\n')
@@ -306,7 +325,18 @@ def generate_frames():
 
     while True:
         try:
-            success, frame = cam.read()
+            if hasattr(cam, 'capture'):
+                # PiCamera
+                frame = np.empty((480, 640, 3), dtype=np.uint8)
+                try:
+                    cam.capture(frame, format='bgr')
+                    success = True
+                except Exception as e:
+                    print(f"Error capturing frame: {e}")
+                    success = False
+            else:
+                # VideoCapture
+                success, frame = cam.read()
             if not success:
                 break
             

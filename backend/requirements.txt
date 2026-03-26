@@ -11,3 +11,5 @@ easyocr
 pyjwt
 python-multipart
 # opencv-python
+picamera
+pyserial

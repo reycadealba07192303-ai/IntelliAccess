@@ -111,37 +111,29 @@ const CameraPage = () => {
 
     // --- Client-Side Camera & AI Scanning ---
     useEffect(() => {
-        let stream: MediaStream | null = null;
         let scanInterval: NodeJS.Timeout;
         let clearTimer: NodeJS.Timeout;
         let isMounted = true;
 
         const startCamera = async () => {
             if (selectedCamera !== 1) {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
+                // For other cameras, could implement RTSP or other sources
                 setIsStreaming(false);
                 return;
             }
 
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        facingMode: { ideal: 'environment' } // Prefer back camera on mobile, fallback safely on laptops
-                    } 
-                });
-                if (!isMounted) {
-                    // If component unmounted while we were waiting for camera, stop tracks and exit
-                    stream.getTracks().forEach(track => track.stop());
-                    return;
-                }
-
+                // Use backend stream instead of browser camera
                 if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    setIsStreaming(true);
+                    videoRef.current.src = `${API_BASE_URL}/stream`;
+                    videoRef.current.onloadeddata = () => {
+                        videoRef.current?.play();
+                        setIsStreaming(true);
+                    };
+                    videoRef.current.onerror = () => {
+                        setIsStreaming(false);
+                        toast.error("Failed to load camera stream");
+                    };
                 }
 
                 // Start the scanning loop
@@ -285,9 +277,6 @@ const CameraPage = () => {
 
         return () => {
             isMounted = false;
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
             if (scanInterval) clearInterval(scanInterval);
             if (clearTimer) clearTimeout(clearTimer);
         };

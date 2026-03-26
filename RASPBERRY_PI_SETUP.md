@@ -21,16 +21,20 @@ sudo apt upgrade -y
 
 ---
 
-## Step 2: Enable Raspberry Pi Camera
+## Step 2: Enable SSH and Verify Camera
 
+*(Note: On newer Raspberry Pi OS versions like Bullseye/Bookworm, the Camera is auto-detected and no longer needs to be enabled in Interfacing Options).*
+
+**To enable SSH (for remote access):**
 ```bash
 sudo raspi-config
 ```
 
 Navigate to:
-- **Interfacing Options** → **Camera** → **Enable**
-- **Interfacing Options** → **SSH** → **Enable** (optional, for remote access)
-- Exit and reboot
+- **Interfacing Options** → **SSH** → **Yes/Enable**
+- Select `<Finish>` to exit.
+
+*(Reboot if you made changes to SSH or want to ensure hardware changes are applied).*
 
 ```bash
 sudo reboot
@@ -42,8 +46,7 @@ sudo reboot
 
 ```bash
 sudo apt install -y python3-pip python3-venv python3-dev
-sudo apt install -y libopenblas0 libomp-dev
-sudo apt install -y python3-picamera
+sudo apt install -y libopenblas0 libomp-dev gfortran libopenblas-dev liblapack-dev
 sudo apt install -y git
 sudo apt install -y nodejs npm
 ```
@@ -80,14 +83,10 @@ source venv/bin/activate  # For Raspberry Pi OS
 ## Step 6: Install Python Dependencies
 
 ```bash
-pip install --upgrade pip setuptools wheel
+pip install --upgrachade pip setuptools wheel
 pip install -r requirements.txt
 ```
 
-**Note:** The `picamera` dependency is already in `requirements.txt`. If it fails, install manually:
-```bash
-pip install picamera
-```
 
 ---
 
@@ -291,15 +290,15 @@ Open browser: `http://<raspberry-pi-ip>:5173/admin/camera`
 
 ### Camera not working
 ```bash
-# Check if camera is detected
-vcgencmd get_camera
+# Test if libcamera detects the camera
+libcamera-hello
 
-# Test camera
-raspistill -o test.jpg
+# Take a test picture
+libcamera-jpeg -o test.jpg
 
-# Check permissions
-groups pi  # Should include 'video'
-sudo usermod -a -G video pi
+# If no cameras are available, edit the boot config:
+# sudo nano /boot/firmware/config.txt (or /boot/config.txt)
+# Ensure the line `camera_auto_detect=1` is present.
 ```
 
 ### RFID reader not found
