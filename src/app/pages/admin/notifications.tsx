@@ -89,80 +89,79 @@ const NotificationsPage = () => {
                 </div>
             </div>
 
-            {/* Filters and Search */}
-            <GlassCard className="p-4">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-                        {["all", "unread", "user", "system", "alert"].map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filter === f
-                                    ? "bg-blue-600/20 text-blue-400 ring-1 ring-blue-600/40"
-                                    : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
-                                    }`}
-                            >
-                                {f.charAt(0).toUpperCase() + f.slice(1)}
-                            </button>
-                        ))}
-                    </div>
+            {/* Combined Filters and Notifications List */}
+            <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
+                <div className="p-6 bg-[#0f172a] z-10">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+                            {["all", "unread", "user", "system", "alert"].map((f) => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filter === f
+                                        ? "bg-blue-600/20 text-blue-400 ring-1 ring-blue-600/40"
+                                        : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
+                                        }`}
+                                >
+                                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                                </button>
+                            ))}
+                        </div>
 
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                        <input
-                            type="text"
-                            placeholder="Search messages..."
-                            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 md:w-64"
-                        />
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                            <input
+                                type="text"
+                                placeholder="Search messages..."
+                                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 md:w-64"
+                            />
+                        </div>
                     </div>
                 </div>
-            </GlassCard>
 
-            {/* Notifications List */}
-            <div className="space-y-3">
-                {filteredNotifications.map((notification) => (
-                    <GlassCard key={notification.id} className={`transition-opacity duration-200 ${notification.read ? "opacity-75" : "opacity-100 border-l-4 border-l-blue-500"}`}>
-                        <div className="flex items-start gap-4">
-                            {notification.profile_url ? (
-                                <img src={notification.profile_url} alt="Profile" className="h-11 w-11 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
-                            ) : (
-                                <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10 shrink-0">
-                                    {getIcon(notification.type)}
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h4 className={`text-base font-semibold ${notification.read ? "text-slate-300" : "text-white"}`}>
-                                            {notification.title}
-                                        </h4>
-                                        <p className="mt-1 text-sm text-slate-400">{notification.message}</p>
+                <div className="overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pt-6 pb-6 space-y-3 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+                        {filteredNotifications.map((notification) => (
+                            <GlassCard key={notification.id} className={`transition-opacity duration-200 ${notification.read ? "opacity-75" : "opacity-100 border-l-4 border-l-blue-500 bg-white/5"}`}>
+                                <div className="flex items-start gap-4">
+                                    {notification.type && (
+                                        <div className="mt-1 shrink-0 rounded-full bg-white/5 p-2 ring-1 ring-white/10">
+                                            {getIcon(notification.type)}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h4 className={`text-base font-semibold ${notification.read ? "text-slate-300" : "text-white"}`}>
+                                                    {notification.title}
+                                                </h4>
+                                                <p className="mt-1 text-sm text-slate-400">{notification.message}</p>
+                                            </div>
+                                            <span className="shrink-0 text-xs text-slate-500">{notification.time}</span>
+                                        </div>
                                     </div>
-                                    <span className="shrink-0 text-xs text-slate-500">{notification.time}</span>
+                                    <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                        <button
+                                            onClick={() => deleteNotification(notification.id)}
+                                            className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                                <button
-                                    onClick={() => deleteNotification(notification.id)}
-                                    className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
-                    </GlassCard>
-                ))}
+                            </GlassCard>
+                        ))}
 
-                {filteredNotifications.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10 mb-4">
-                            <Bell className="h-8 w-8 text-slate-600" />
-                        </div>
-                        <h3 className="text-lg font-medium text-slate-300">No notifications found</h3>
-                        <p className="text-slate-500 max-w-sm mt-1">There are no notifications matching your current filter.</p>
-                    </div>
-                )}
-            </div>
+                        {filteredNotifications.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10 mb-4">
+                                    <Bell className="h-8 w-8 text-slate-600" />
+                                </div>
+                                <h3 className="text-lg font-medium text-slate-300">No notifications found</h3>
+                                <p className="text-slate-500 max-w-sm mt-1">There are no notifications matching your current filter.</p>
+                            </div>
+                        )}
+                </div>
+            </GlassCard>
         </div>
     );
 };

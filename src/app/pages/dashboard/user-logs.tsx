@@ -122,50 +122,52 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                     </button>
                 </div>
 
-                <GlassCard className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <input
-                            type="text"
-                            placeholder="Search by plate or gate..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                        />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
+                    {/* Header/Filters */}
+                    <div className="p-6 bg-[#0f172a] z-10 flex flex-col gap-4 lg:flex-row lg:items-center">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                             <input
-                                type="date"
-                                value={dateFilter}
-                                onChange={(e) => setDateFilter(e.target.value)}
-                                className="rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-300 outline-none focus:bg-white/10"
+                                type="text"
+                                placeholder="Search by plate or gate..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                             />
                         </div>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:bg-white/10"
-                        >
-                            <option>All Status</option>
-                            <option>Authorized</option>
-                            <option>Denied</option>
-                        </select>
+                        <div className="flex flex-wrap gap-2">
+                            <div className="relative">
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                <input
+                                    type="date"
+                                    value={dateFilter}
+                                    onChange={(e) => setDateFilter(e.target.value)}
+                                    className="rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-300 outline-none focus:bg-white/10"
+                                />
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:bg-white/10"
+                            >
+                                <option>All Status</option>
+                                <option>Authorized</option>
+                                <option>Denied</option>
+                            </select>
+                        </div>
                     </div>
-                </GlassCard>
 
-                <GlassCard className="overflow-hidden p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-slate-400">
-                            <thead className="bg-white/5 text-xs uppercase text-slate-500">
+                    {/* Table Area */}
+                    <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pt-6 pb-6 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+                        <table className="w-full text-left text-sm text-slate-400 border-collapse">
+                            <thead className="sticky top-0 bg-[#0f172a] z-10 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-white/5 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
                                 <tr>
-                                    <th className="px-6 py-4 font-semibold">Vehicle</th>
-                                    <th className="px-6 py-4 font-semibold">Location</th>
-                                    <th className="px-6 py-4 font-semibold">Date</th>
-                                    <th className="px-6 py-4 font-semibold">Time In</th>
-                                    <th className="px-6 py-4 font-semibold">Time Out</th>
-                                    <th className="px-6 py-4 font-semibold">Status</th>
+                                    <th className="px-6 py-4 font-medium">Vehicle</th>
+                                    <th className="px-6 py-4 font-medium">Location</th>
+                                    <th className="px-6 py-4 font-medium">Date</th>
+                                    <th className="px-6 py-4 font-medium">Time In</th>
+                                    <th className="px-6 py-4 font-medium">Time Out</th>
+                                    <th className="px-6 py-4 font-medium">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
@@ -177,7 +179,7 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                                     filteredLogs.map((session) => {
                                         const status = session.status;
                                         return (
-                                            <tr key={session.id} className="group hover:bg-white/5 transition-colors">
+                                            <tr key={session.id} className="group hover:bg-white/[0.03] transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         {session.image_url && (
@@ -215,10 +217,16 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${status === "GRANTED" ? "bg-emerald-500/10 text-emerald-400" :
-                                                        status === "DENIED" ? "bg-red-500/10 text-red-400" :
-                                                            "bg-yellow-500/10 text-yellow-400"
-                                                        }`}>
+                                                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs border bg-transparent ${
+                                                        status === "GRANTED" ? "text-emerald-400 border-emerald-500/30" :
+                                                        status === "DENIED" ? "text-red-400 border-red-500/30" :
+                                                        "text-amber-500 border-amber-500/30"
+                                                    }`}>
+                                                        <span className={`h-1.5 w-1.5 rounded-full ${
+                                                            status === "GRANTED" ? "bg-emerald-400" :
+                                                            status === "DENIED" ? "bg-red-400" :
+                                                            "bg-amber-500"
+                                                        }`}></span>
                                                         {status === "GRANTED" ? "Allowed" : status}
                                                     </span>
                                                 </td>

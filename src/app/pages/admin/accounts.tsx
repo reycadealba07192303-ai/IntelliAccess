@@ -428,66 +428,68 @@ const AccountsPage = () => {
         </div>
       </div>
 
-      {/* Tabs-style role filter + search */}
-      <GlassCard className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="inline-flex gap-1.5 rounded-full bg-slate-900/80 p-1.5">
-            {["All", "Student", "Professor", "Utility", "Admin"].map((role) => (
-              <button
-                key={role}
-                onClick={() => setRoleFilter(role as any)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${roleFilter === role
-                  ? "bg-white text-slate-900"
-                  : "text-slate-300 hover:bg-white/5"
-                  }`}
-              >
-                {role === "All" ? "All Accounts" : role}
-              </button>
-            ))}
-          </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or plate number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-            />
+      {/* Tabs-style role filter + search and Table List */}
+      <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
+        <div className="px-6 pt-6 pb-2 bg-[#0f172a] z-10 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="inline-flex gap-1.5 rounded-full bg-slate-900/80 p-1.5">
+              {["All", "Student", "Professor", "Utility", "Admin"].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => setRoleFilter(role as any)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${roleFilter === role
+                    ? "bg-white text-slate-900"
+                    : "text-slate-300 hover:bg-white/5"
+                    }`}
+                >
+                  {role === "All" ? "All Accounts" : role}
+                </button>
+              ))}
+            </div>
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search by name, email, or plate number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              />
+            </div>
           </div>
         </div>
 
         {/* Single table, sorted/grouped like the example */}
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/60">
-          <table className="w-full text-left text-base text-slate-300">
-            <thead className="bg-white/5 text-sm uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-4 py-3 font-semibold">User</th>
-                <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold">Role</th>
-                <th className="px-4 py-3 font-semibold">Vehicle</th>
-                <th className="px-4 py-3 font-semibold">Last Active</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 text-sm">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] px-4 pt-0 pb-4 after:content-[''] after:block after:h-4 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <table className="w-full text-left text-sm text-slate-300 border-collapse">
+              <thead className="sticky top-0 bg-[#0f172a]/80 backdrop-blur-md z-10 text-xs uppercase tracking-wider text-slate-400 font-bold border-b border-white/10 shadow-[0_1px_10px_0_rgba(0,0,0,0.2)]">
+                <tr>
+                  <th className="px-4 py-2 font-medium">User</th>
+                  <th className="px-4 py-2 font-medium">Email</th>
+                  <th className="px-4 py-2 font-medium">Role</th>
+                  <th className="px-4 py-2 font-medium">Vehicle</th>
+                  <th className="px-4 py-2 font-medium">Last Active</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-sm">
               {sortedUsers.map((user) => (
-                <tr key={user.id} className="group hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3">
+                <tr key={user.id} className="group hover:bg-white/[0.03] transition-colors">
+                  <td className="px-4 py-2">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">
                         {user.name.charAt(0)}
                       </div>
-                      <span className="font-medium text-white">{user.name}</span>
+                      <span className="font-medium text-white truncate">{user.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-[15px] text-slate-200">
+                  <td className="px-4 py-2 text-xs text-slate-200 truncate max-w-[200px]">
                     {user.email}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     <div
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${getRoleBadge(
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${getRoleBadge(
                         user.role
                       )}`}
                     >
@@ -495,38 +497,38 @@ const AccountsPage = () => {
                       {user.role}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     {user.vehiclePlate ? (
                       <div>
-                        <div className="font-mono text-sm text-white">
+                        <div className="font-mono text-sm text-white leading-tight">
                           {user.vehiclePlate}
                         </div>
-                        <div className="text-[13px] text-slate-400">
+                        <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">
                           {user.vehicleModel}
                         </div>
                       </div>
                     ) : (
-                      <span className="text-sm italic text-slate-600">
+                      <span className="text-xs italic text-slate-600">
                         No vehicle
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-400">
+                  <td className="px-4 py-2 text-xs text-slate-400 whitespace-nowrap">
                     {user.lastActive}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${user.status === "Active"
-                        ? "bg-emerald-500/10 text-emerald-400"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] border whitespace-nowrap ${user.status === "Active"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                         : user.status === "Pending"
-                          ? "bg-yellow-500/10 text-yellow-300"
+                          ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/30"
                           : user.status === "Blacklisted"
-                            ? "bg-red-500/10 text-red-400"
-                            : "bg-slate-500/10 text-slate-400"
+                            ? "bg-red-500/10 text-red-400 border-red-500/30"
+                            : "bg-slate-500/10 text-slate-400 border-slate-500/30"
                         }`}
                     >
                       <span
-                        className={`h-1.5 w-1.5 rounded-full ${user.status === "Active"
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${user.status === "Active"
                           ? "bg-emerald-400"
                           : user.status === "Pending"
                             ? "bg-yellow-300"
@@ -538,26 +540,26 @@ const AccountsPage = () => {
                       {user.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => handleOpenModal(user, "view")}
-                        className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-colors"
+                        className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-1 text-[11px] font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-colors"
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="h-3 w-3" />
                         View
                       </button>
                       <button
                         onClick={() => handleOpenModal(user, "edit")}
-                        className="rounded-lg p-2 hover:bg-white/10 hover:text-blue-400 transition-colors"
+                        className="rounded-lg p-1.5 hover:bg-white/10 hover:text-blue-400 transition-colors"
                       >
-                        <Edit2 className="h-4 w-4" />
+                        <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(user.id)}
-                        className="rounded-lg p-2 hover:bg-white/10 hover:text-red-400 transition-colors"
+                        className="rounded-lg p-1.5 hover:bg-white/10 hover:text-red-400 transition-colors"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -573,8 +575,8 @@ const AccountsPage = () => {
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
         </div>
       </GlassCard>
 

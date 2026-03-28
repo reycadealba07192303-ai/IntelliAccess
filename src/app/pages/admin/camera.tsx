@@ -87,8 +87,8 @@ const CameraPage = () => {
 
     const currentCamera = cameras.find(c => c.id === selectedCamera) || cameras[0] || {};
 
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
+    const lastScanIdRef = useRef<string | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const scanningRef = useRef(false);
 
@@ -109,171 +109,77 @@ const CameraPage = () => {
         label: `${detectionResult.plate_number || 'PLATE'} (${(detectionResult.confidence || 0).toFixed(1)}%)`,
     } : null;
 
-    // --- Client-Side Camera & AI Scanning ---
+    // --- Backend-Driven Camera & AI Polling ---
     useEffect(() => {
         let scanInterval: NodeJS.Timeout;
         let clearTimer: NodeJS.Timeout;
         let isMounted = true;
 
-        const startCamera = async () => {
-            if (selectedCamera !== 1) {
-                // For other cameras, could implement RTSP or other sources
-                setIsStreaming(false);
-                return;
-            }
+        if (selectedCamera === 1) {
+            setIsStreaming(true); // Assuming the img tag will load the MJPEG stream
 
-            try {
-                // Use backend stream instead of browser camera
-                if (videoRef.current) {
-                    videoRef.current.src = `${API_BASE_URL}/stream`;
-                    videoRef.current.onloadeddata = () => {
-                        videoRef.current?.play();
-                        setIsStreaming(true);
-                    };
-                    videoRef.current.onerror = () => {
-                        setIsStreaming(false);
-                        toast.error("Failed to load camera stream");
-                    };
-                }
+            if (isAutoScanning) {
+                // Poll the backend's /latest-scan endpoint every second
+                scanInterval = setInterval(async () => {
+                    if (scanningRef.current) return;
+                    scanningRef.current = true;
+                    setScanStatus('scanning');
 
-                // Start the scanning loop
-                if (isAutoScanning) {
-                    // Delay scan slightly to ensure video has started playing and dimensions are loaded
-                    scanInterval = setInterval(async () => {
-                        if (!videoRef.current || !canvasRef.current || videoRef.current.readyState < 2 || scanningRef.current) return;
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/latest-scan`);
+                        if (!response.ok) return;
 
-                        const now = Date.now();
+                        const data = await response.json();
                         
-                        // Dynamic capture gap logic
-                        let requiredGap = 4000; // Default 4 seconds gap
-                        if (lastScanStatusRef.current === 'denied') {
-                            requiredGap = 2000; // Fast 2-second retry if denied/misread
-                        } else if (lastScanStatusRef.current === 'granted') {
-                            requiredGap = 5000; // 5-second pause if granted
-                        }
-
-                        if (now - lastScanTimeRef.current < requiredGap) {
-                            return;
-                        }
-
-                        scanningRef.current = true;
-                        setScanStatus('scanning');
-                        lastScanTimeRef.current = now;
-
-                        const canvas = canvasRef.current;
-                        const video = videoRef.current;
-                        
-                        const vW = video.videoWidth;
-                        const vH = video.videoHeight;
-                        
-                        const sx = Math.round(vW * ROI.left);
-                        const sy = Math.round(vH * ROI.top);
-                        const sWidth = Math.round(vW * ROI.width);
-                        const sHeight = Math.round(vH * ROI.height);
-                        
-                        canvas.width = sWidth;
-                        canvas.height = sHeight;
-                        
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                            // Draw only the target overlay crop (plate window) to the canvas
-                            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                        if (data.detected && data.id !== lastScanIdRef.current) {
+                            lastScanIdRef.current = data.id;
                             
-                            // Convert to blob and send to backend
-                            canvas.toBlob(async (blob) => {
-                                if (!blob || !isMounted) {
-                                    scanningRef.current = false;
-                                    return;
-                                }
-                                
-                                const formData = new FormData();
-                                formData.append('file', blob, 'frame.jpg');
+                            setScanStatus('found');
+                            setScanCount(c => c + 1);
 
-                                try {
-                                    const response = await fetch(`${API_BASE_URL}/detect`, {
-                                        method: 'POST',
-                                        body: formData
-                                    });
+                            // Flash effect
+                            setIsCapturing(true);
+                            setTimeout(() => {
+                                if (isMounted) setIsCapturing(false);
+                            }, 150);
 
-                                    if (!response.ok) {
-                                        console.error("Detection endpoint error", response.status);
-                                        return;
-                                    }
+                            // Show Results Panel
+                            setIsProcessing(false);
+                            setDetectionResult(data);
+                            
+                            if (data.access_granted) {
+                                toast.success(`Granted: ${data.plate_number}`);
+                            } else {
+                                toast.error(`Denied: ${data.plate_number}`);
+                            }
 
-                                    const data = await response.json();
-                                    
-                                    // Only trigger UI if backend detected a REAL plate number
-                                    // (data.detected can be true for vehicle body alone, without a plate read)
-                                    const hasRealPlate = data.detected && 
-                                        data.plate_number && 
-                                        data.plate_number !== "Not Detected" && 
-                                        data.plate_number !== "OCR Error" &&
-                                        data.plate_number.length >= 4;
-
-                                    if (hasRealPlate) {
-                                        setScanStatus('found');
-                                        setScanCount(c => c + 1);
-
-                                        // 2. Perform the exact "Capture" blink flash
-                                        setIsCapturing(true);
-                                        setTimeout(() => {
-                                            if (isMounted) setIsCapturing(false);
-                                        }, 150);
-
-                                        // 3. Show Results Panel
-                                        setIsProcessing(false);
-                                        setDetectionResult(data);
-                                        
-                                        lastScanStatusRef.current = data.access_granted ? 'granted' : 'denied';
-
-                                        if (data.access_granted) {
-                                            toast.success(`Granted: ${data.plate_text || data.plate_number}`);
-                                        } else {
-                                            toast.error(`Denied: ${data.plate_text || data.plate_number}`);
-                                        }
-
-                                        // 4. Panel stays for 5 seconds, then clears
-                                        if (clearTimer) clearTimeout(clearTimer);
-                                        clearTimer = setTimeout(() => {
-                                            if (isMounted) setDetectionResult(null);
-                                        }, 5000);
-                                        
-                                        // Set status so 'finally' block doesn't revert to empty
-                                        setScanStatus('idle');
-                                        return;
-                                    }
-                                } catch (err: any) {
-                                    console.error("Scanning error:", err);
+                            // Panel stays for 5 seconds, then clears
+                            if (clearTimer) clearTimeout(clearTimer);
+                            clearTimer = setTimeout(() => {
+                                if (isMounted) {
+                                    setDetectionResult(null);
                                     setScanStatus('idle');
-                                } finally {
-                                    if (isMounted) {
-                                        // If we completed a successful scan, scanStatus is likely 'idle' or 'found'. 
-                                        // Only show 'empty' if we actually failed to find a plate in the current scan.
-                                        if (scanStatus === 'scanning') {
-                                            if (lastScanStatusRef.current !== 'granted' && lastScanStatusRef.current !== 'denied') {
-                                                lastScanStatusRef.current = 'idle';
-                                            }
-                                            setScanStatus('empty');
-                                            setTimeout(() => setScanStatus(s => s === 'empty' ? 'idle' : s), 1500);
-                                        }
-                                        scanningRef.current = false;
-                                    }
                                 }
-                            }, 'image/jpeg', 0.85);
+                            }, 5000);
                         } else {
+                            setScanStatus(prev => prev === 'found' ? 'found' : 'empty');
+                            setTimeout(() => {
+                                if (isMounted) setScanStatus(prev => prev === 'empty' ? 'idle' : prev);
+                            }, 800);
+                        }
+                    } catch (err) {
+                        console.error("Polling error:", err);
+                        setScanStatus('idle');
+                    } finally {
+                        if (isMounted) {
                             scanningRef.current = false;
                         }
-                    }, SCAN_INTERVAL_MS);
-                }
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                if (isMounted) {
-                    toast.error("Could not access device camera");
-                }
+                    }
+                }, SCAN_INTERVAL_MS);
             }
-        };
-
-        startCamera();
+        } else {
+            setIsStreaming(false);
+        }
 
         return () => {
             isMounted = false;
@@ -301,18 +207,17 @@ const CameraPage = () => {
                 <div className="lg:col-span-2 space-y-6">
                     <GlassCard className="p-0 overflow-hidden relative group">
                         <div className="relative aspect-video bg-black">
-                            {/* Hidden canvas for capturing frames */}
-                            <canvas ref={canvasRef} className="hidden" />
-                            
-                            {/* Camera Feed Logic */}
                             {selectedCamera === 1 ? (
                                 <>
-                                    <video
-                                        ref={videoRef}
-                                        autoPlay
-                                        playsInline
-                                        muted
+                                    <img
+                                        ref={imgRef}
+                                        src={`${API_BASE_URL}/live-feed`}
+                                        alt="Raspberry Pi Camera Feed"
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            console.error("Failed to load camera feed");
+                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 800 600"><rect width="100%" height="100%" fill="%230f172a"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%2364748b">Camera feed offline or loading...</text></svg>';
+                                        }}
                                     />
                                     {/* Capture Flash Effect */}
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />

@@ -73,50 +73,52 @@ const UserNotificationsPage: React.FC<UserNotificationsPageProps> = ({ userType 
                 </div>
 
                 {/* Notifications List */}
-                <div className="space-y-3">
-                    {notifications.map((notification) => (
-                        <GlassCard key={notification.id} className={`transition-opacity duration-200 opacity-100 border-l-4 border-l-blue-500`}>
-                            <div className="flex items-start gap-4">
-                                {notification.profile_url ? (
-                                    <img src={notification.profile_url} alt="Profile" className="h-11 w-11 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
-                                ) : (
-                                    <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10 shrink-0">
-                                        <Bell className="h-5 w-5 text-blue-400" />
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <h4 className={`text-base font-semibold text-white`}>
-                                                {notification.title}
-                                            </h4>
-                                            <p className="mt-1 text-sm text-slate-400">{notification.message}</p>
+                <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a]">
+                    <div className="overflow-y-auto max-h-[600px] px-6 pt-6 pb-6 space-y-3 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+                            {notifications.map((notification) => (
+                                <GlassCard key={notification.id} className={`transition-opacity duration-200 opacity-100 border-l-4 border-l-blue-500 bg-white/5`}>
+                                    <div className="flex items-start gap-4">
+                                        {notification.profile_url ? (
+                                            <img src={notification.profile_url} alt="Profile" className="h-11 w-11 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+                                        ) : (
+                                            <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10 shrink-0">
+                                                <Bell className="h-5 w-5 text-blue-400" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <h4 className={`text-base font-semibold text-white`}>
+                                                        {notification.title}
+                                                    </h4>
+                                                    <p className="mt-1 text-sm text-slate-400">{notification.message}</p>
+                                                </div>
+                                                <span className="shrink-0 text-xs text-slate-500">{notification.time}</span>
+                                            </div>
                                         </div>
-                                        <span className="shrink-0 text-xs text-slate-500">{notification.time}</span>
+                                        <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100 hidden">
+                                            <button
+                                                onClick={() => deleteNotification(notification.id)}
+                                                className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100 hidden">
-                                    <button
-                                        onClick={() => deleteNotification(notification.id)}
-                                        className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </GlassCard>
-                    ))}
+                                </GlassCard>
+                            ))}
 
-                    {notifications.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10 mb-4">
-                                <Bell className="h-8 w-8 text-slate-600" />
-                            </div>
-                            <h3 className="text-lg font-medium text-slate-300">No notifications found</h3>
-                            <p className="text-slate-500 max-w-sm mt-1">You have no recent activity.</p>
-                        </div>
-                    )}
-                </div>
+                            {notifications.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10 mb-4">
+                                        <Bell className="h-8 w-8 text-slate-600" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-slate-300">No notifications found</h3>
+                                    <p className="text-slate-500 max-w-sm mt-1">You have no recent activity.</p>
+                                </div>
+                            )}
+                    </div>
+                </GlassCard>
             </div>
         </DashboardLayout>
     );

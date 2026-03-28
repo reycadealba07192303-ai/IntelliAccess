@@ -100,110 +100,145 @@ const VehiclesPage = () => {
         </div>
       </div>
 
-      <GlassCard className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search plate number, model, or owner..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-          />
+      <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
+        {/* Header/Filters */}
+        <div className="p-6 bg-[#0f172a] z-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search plate number, model, or owner..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:border-blue-500/50"
+            >
+              <option value="All">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Blacklisted">Blacklisted</option>
+              <option value="Pending">Pending</option>
+            </select>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:border-blue-500/50"
-          >
-            <option value="All">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Blacklisted">Blacklisted</option>
-            <option value="Pending">Pending</option>
-          </select>
+
+        {/* Table Area */}
+        <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pt-6 pb-6 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="sticky top-0 bg-[#0f172a] z-10 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-white/5 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
+              <tr>
+                <th className="px-6 py-4 font-medium">Vehicle</th>
+                <th className="px-6 py-4 font-medium">Plate Number</th>
+                <th className="px-6 py-4 font-medium">Owner</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-slate-500">Loading vehicles...</td>
+                </tr>
+              ) : filteredVehicles.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-slate-500">No vehicles found.</td>
+                </tr>
+              ) : (
+                filteredVehicles.map((v) => {
+                  const statusClasses =
+                    v.status === "Active"
+                      ? "bg-transparent text-emerald-400 border-emerald-500/30"
+                      : v.status === "Blacklisted"
+                        ? "bg-transparent text-slate-400 border-slate-500/30"
+                        : "bg-transparent text-amber-500 border-amber-500/30";
+
+                  const dotColor =
+                    v.status === "Active"
+                      ? "bg-emerald-400"
+                      : v.status === "Blacklisted"
+                        ? "bg-slate-400"
+                        : "bg-amber-500";
+
+                  const displayStatus = v.status === "Blacklisted" ? "In Active" : v.status;
+
+                  return (
+                    <tr key={v.id} className="hover:bg-white/[0.03] transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-slate-200">{v.model}</span>
+                          <span className="text-xs text-slate-500">{v.color}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-sm tracking-widest bg-white/10 px-2 py-1 rounded inline-block">
+                          {v.plate_number}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-200">{v.owner?.full_name || "Unknown"}</span>
+                          <span className="text-xs text-blue-400">{v.owner?.role || "GUEST"}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs border ${statusClasses}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`}></span>
+                          {displayStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {v.status === "Pending" && (
+                            <button
+                              onClick={() => handleUpdateStatus(v.id, "Active")}
+                              className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors"
+                              title="Approve"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          {v.status !== "Active" && v.status !== "Pending" && (
+                            <button
+                              onClick={() => handleUpdateStatus(v.id, "Active")}
+                              className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors"
+                              title="Reactivate"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          {v.status !== "Blacklisted" && (
+                            <button
+                              onClick={() => handleUpdateStatus(v.id, "Blacklisted")}
+                              className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                              title="Blacklist"
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(v.id)}
+                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            title="Delete Vehicle"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </GlassCard>
-
-      {isLoading ? (
-        <div className="text-center py-12 text-slate-500">Loading vehicles...</div>
-      ) : filteredVehicles.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No vehicles found.</div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredVehicles.map((v) => {
-            const statusClasses =
-              v.status === "Active"
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : v.status === "Blacklisted"
-                  ? "bg-red-500/10 text-red-400 border-red-500/20"
-                  : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
-
-            return (
-              <GlassCard key={v.id} className="group relative overflow-hidden flex flex-col justify-between h-full" hoverEffect>
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border ${statusClasses}`}>
-                      {v.status}
-                    </span>
-                    <button
-                      onClick={() => handleDelete(v.id)}
-                      className="text-slate-500 hover:text-red-400 transition-colors p-1"
-                      title="Delete Vehicle"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <h3 className="text-2xl font-mono font-bold text-white tracking-wider mb-1">{v.plate_number}</h3>
-                  <p className="text-sm text-slate-400 mb-4">{v.model} • {v.color}</p>
-
-                  <div className="border-t border-white/10 pt-4 mb-4">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Owner</p>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-200 truncate">{v.owner?.full_name || "Unknown"}</span>
-                      <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded">
-                        {v.owner?.role || "GUEST"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t border-white/5">
-                  {v.status === "Pending" && (
-                    <button
-                      onClick={() => handleUpdateStatus(v.id, "Active")}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" /> Approve
-                    </button>
-                  )}
-                  {v.status !== "Active" && v.status !== "Pending" && (
-                    <button
-                      onClick={() => handleUpdateStatus(v.id, "Active")}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" /> Reactivate
-                    </button>
-                  )}
-                  {v.status !== "Blacklisted" && (
-                    <button
-                      onClick={() => handleUpdateStatus(v.id, "Blacklisted")}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
-                    >
-                      <AlertCircle className="h-3.5 w-3.5" /> Blacklist
-                    </button>
-                  )}
-                </div>
-              </GlassCard>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };
-
 
 export default VehiclesPage;
