@@ -228,8 +228,6 @@ const LogsPage = () => {
             >
               <option value="All Gates" className="bg-slate-900 text-white">All Gates</option>
               <option value="Main Gate" className="bg-slate-900 text-white">Main Gate</option>
-              <option value="Back Gate" className="bg-slate-900 text-white">Back Gate</option>
-              <option value="Service Gate" className="bg-slate-900 text-white">Service Gate</option>
             </select>
             <select
               value={roleFilter}
