@@ -9,7 +9,9 @@ import {
     CheckCircle2,
     XCircle,
     Trash2,
-    X
+    X,
+    Tag,
+    Camera
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
@@ -89,6 +91,8 @@ const CameraPage = () => {
 
     const imgRef = useRef<HTMLImageElement>(null);
     const lastScanIdRef = useRef<string | null>(null);
+    const lastRfidScanIdRef = useRef<string | null>(null);
+    const [rfidStatus, setRfidStatus] = useState<{connected: boolean, polling: boolean}>({connected: false, polling: false});
     const [isStreaming, setIsStreaming] = useState(false);
     const scanningRef = useRef(false);
 
@@ -187,6 +191,67 @@ const CameraPage = () => {
             if (clearTimer) clearTimeout(clearTimer);
         };
     }, [selectedCamera, isAutoScanning]);
+
+    // --- RFID Hardware Polling ---
+    useEffect(() => {
+        let statusInterval: NodeJS.Timeout;
+        let isMounted = true;
+
+        const checkRfid = async () => {
+            try {
+                // 1. Check Reader Connection Status
+                const statusRes = await fetch(`${API_BASE_URL}/rfid/status`);
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    if (isMounted) setRfidStatus(statusData);
+                }
+
+                // 2. Check for Latest Scan
+                const scanRes = await fetch(`${API_BASE_URL}/rfid/latest-scan`);
+                if (scanRes.ok) {
+                    const scanData = await scanRes.json();
+                    
+                    if (scanData.detected && scanData.id !== lastRfidScanIdRef.current) {
+                        lastRfidScanIdRef.current = scanData.id;
+                        
+                        // Signal "found" status briefly on main UI
+                        setScanStatus('found');
+                        setScanCount(c => c + 1);
+                        setIsCapturing(true);
+                        setTimeout(() => { if (isMounted) setIsCapturing(false); }, 150);
+
+                        // Show Results
+                        setIsProcessing(false);
+                        setDetectionResult(scanData);
+
+                        if (scanData.access_granted) {
+                            toast.success(`RFID Tag Verified: ${scanData.plate_number || scanData.rfid_tag}`);
+                        } else {
+                            toast.error(`RFID Tag Denied: ${scanData.plate_number || scanData.rfid_tag}`);
+                        }
+
+                        // Reset UI after 5 seconds
+                        setTimeout(() => {
+                            if (isMounted) {
+                                setDetectionResult(null);
+                                setScanStatus('idle');
+                            }
+                        }, 5000);
+                    }
+                }
+            } catch (err) {
+                console.error("RFID poll error:", err);
+            }
+        };
+
+        statusInterval = setInterval(checkRfid, 2000);
+        checkRfid(); // Immediate check
+
+        return () => {
+            isMounted = false;
+            clearInterval(statusInterval);
+        };
+    }, []);
 
     return (
         <motion.div
@@ -290,6 +355,13 @@ const CameraPage = () => {
                                 </span>
                             </div>
 
+                            <div className="absolute top-4 left-44 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md border border-white/5">
+                                <div className={`h-2 w-2 rounded-full ${rfidStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${rfidStatus.connected ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                    {rfidStatus.connected ? "RFID ACTIVE" : "RFID OFFLINE"}
+                                </span>
+                            </div>
+
                             <div className="absolute top-4 right-4 flex flex-col items-end gap-2 text-white/80">
                                 <span className="text-xs font-mono">{new Date().toLocaleTimeString()}</span>
                             </div>
@@ -344,8 +416,15 @@ const CameraPage = () => {
                                         {/* Top Section: Status & Plate */}
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-start gap-4 flex-1">
-                                                <div className={`p-4 rounded-xl ${detectionResult.access_granted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                <div className={`p-4 rounded-xl relative ${detectionResult.access_granted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                                                     {detectionResult.access_granted ? <CheckCircle2 className="h-8 w-8" /> : <XCircle className="h-8 w-8" />}
+                                                    <div className="absolute -bottom-1 -right-1 bg-[#0f172a] p-1 rounded-full border border-white/10">
+                                                        {detectionResult.method === 'RFID' ? (
+                                                            <Tag className="h-3 w-3 text-emerald-400" />
+                                                        ) : (
+                                                            <Camera className="h-3 w-3 text-blue-400" />
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex-1">
                                                     <h3 className="text-3xl font-bold text-white tracking-widest mb-2">

@@ -104,6 +104,7 @@ class VehicleUpdate(BaseModel):
     status: Optional[str] = None
     plate_number: Optional[str] = None
     model: Optional[str] = None
+    rfid_tag: Optional[str] = None
     color: Optional[str] = None
 
 @router.put("/{vehicle_id}")

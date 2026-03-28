@@ -14,8 +14,10 @@ import {
   Eye,
   ChevronDown,
   Download,
+  Tag,
   Car,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { GlassCard, GlassButton, GlassInput } from "../../components/ui/glass-components";
 import { useNotification } from "../../context/NotificationContext";
@@ -30,6 +32,7 @@ export interface User {
   role: UserRole;
   vehiclePlate?: string;
   vehicleModel?: string;
+  vehicleRfid?: string;
   vehicles?: any[];
   status: "Active" | "Inactive" | "Pending" | "Blacklisted";
   lastActive: string;
@@ -284,6 +287,7 @@ const AccountsPage = () => {
     role: "Student",
     vehiclePlate: "",
     vehicleModel: "",
+    vehicleRfid: "",
     status: "Active",
   });
 
@@ -299,6 +303,7 @@ const AccountsPage = () => {
         role: "Student",
         vehiclePlate: "",
         vehicleModel: "",
+        vehicleRfid: "",
         status: "Active",
       });
     }
@@ -339,15 +344,41 @@ const AccountsPage = () => {
 
     try {
       if (editingUser) {
-        // Update Profile
+        // 1. Update Profile (Name & Role)
         await apiFetch(`/auth/users/${editingUser.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ name: formData.name })
+          body: JSON.stringify({ 
+            name: formData.name, 
+            role: formData.role?.toUpperCase() 
+          })
         });
 
-        // Update local state
-        setUsers((prev) => prev.map((u) => u.id === editingUser.id ? { ...u, ...formData } as User : u));
-        showNotification("User updated successfully", "success");
+        // 2. Handle Vehicle Persistence (RFID, Plate, Model)
+        if (formData.vehiclePlate) {
+          const vehicleData = {
+            plate_number: formData.vehiclePlate,
+            model: formData.vehicleModel || "Unknown",
+            rfid_tag: formData.vehicleRfid || "",
+            owner_id: editingUser.id
+          };
+
+          if (editingUser.vehicles && editingUser.vehicles.length > 0) {
+            // Update existing vehicle
+            const vId = editingUser.vehicles[0].id || editingUser.vehicles[0]._id;
+            await apiFetch(`/vehicles/${vId}`, {
+              method: 'PUT',
+              body: JSON.stringify(vehicleData)
+            });
+          } else {
+            // Create new vehicle
+            await apiFetch(`/vehicles`, {
+              method: 'POST',
+              body: JSON.stringify(vehicleData)
+            });
+          }
+        }
+
+        showNotification("User and vehicle updated successfully", "success");
       } else {
         // Create User - This is tricky client-side without Admin API 
         // usually enables 'Sign Up' instead. 
@@ -747,6 +778,10 @@ const AccountsPage = () => {
                                     <span className="text-slate-500">Vehicle Model</span>
                                     <span className="text-slate-200 font-medium">{v.model}</span>
                                   </div>
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-slate-500">RFID Tag</span>
+                                    <span className="text-slate-200 font-medium">{v.rfid_tag || "—"}</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -932,24 +967,61 @@ const AccountsPage = () => {
                     <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
                       <Car className="h-4 w-4" /> Vehicle Information
                     </h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <GlassInput
-                        placeholder="Plate Number"
-                        value={formData.vehiclePlate}
-                        onChange={e => setFormData({ ...formData, vehiclePlate: e.target.value })}
-                        disabled={!!editingUser}
-                        className={
-                          editingUser
-                            ? "opacity-50 cursor-not-allowed bg-white/5 border-transparent text-slate-400"
-                            : ""
-                        }
-                      />
-                      <GlassInput
-                        placeholder="Vehicle Model"
-                        value={formData.vehicleModel}
-                        onChange={e => setFormData({ ...formData, vehicleModel: e.target.value })}
-                        disabled={false}
-                      />
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          Vehicle Plate
+                        </label>
+                        <GlassInput
+                          placeholder="e.g. ABC 1234"
+                          value={formData.vehiclePlate}
+                          onChange={(e) => setFormData({ ...formData, vehiclePlate: e.target.value.toUpperCase() })}
+                          disabled={!!editingUser}
+                          className={editingUser ? "opacity-50 cursor-not-allowed bg-white/5 border-transparent text-slate-400" : ""}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          Vehicle Model
+                        </label>
+                        <GlassInput
+                          placeholder="e.g. Toyota Vios"
+                          value={formData.vehicleModel}
+                          onChange={(e) => setFormData({ ...formData, vehicleModel: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          RFID Tag (UHF)
+                        </label>
+                        <div className="flex gap-2">
+                          <GlassInput
+                            placeholder="Scan sticker..."
+                            value={formData.vehicleRfid}
+                            onChange={(e) => setFormData({ ...formData, vehicleRfid: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading("Reading RFID...", { id: "rfid-read" });
+                              try {
+                                const res = await apiFetch("/rfid/read", { method: "POST" });
+                                if (res.status === "success") {
+                                  setFormData({ ...formData, vehicleRfid: res.tag_id });
+                                  toast.success("RFID Tag Captured!", { id: "rfid-read" });
+                                } else {
+                                  toast.error(res.message || "No tag found", { id: "rfid-read" });
+                                }
+                              } catch (err) {
+                                toast.error("Failed to read RFID", { id: "rfid-read" });
+                              }
+                            }}
+                            className="rounded-lg bg-blue-600/20 px-3 py-2 text-xs font-bold text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-all"
+                          >
+                            SCAN
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

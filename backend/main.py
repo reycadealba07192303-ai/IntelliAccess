@@ -59,6 +59,16 @@ app.include_router(notifications.router, prefix="/notifications", tags=["Notific
 app.include_router(stats.router, prefix="/stats", tags=["Statistics"])
 app.include_router(cameras.router, prefix="/cameras", tags=["Cameras"])
 
+@app.on_event("startup")
+async def startup_event():
+    """Initializes hardware background workers when the server starts."""
+    if RFID_AVAILABLE:
+        try:
+            from utils.rfid import start_rfid_background_polling
+            start_rfid_background_polling()
+        except Exception as e:
+            print(f"Error starting RFID polling: {e}")
+
 if RFID_AVAILABLE:
     app.include_router(rfid.router, prefix="/rfid", tags=["RFID"])
 
