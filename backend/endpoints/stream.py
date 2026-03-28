@@ -286,8 +286,9 @@ def get_camera():
             except Exception as e:
                 print(f"Error initializing PiCamera: {e}")
                 camera = None
-        else:
-            # Fallback to webcam
+                
+        if camera is None:
+            # Fallback to V4L2 generic camera (either native USB webcam or modern Pi Camera stack)
             try:
                 print("Trying to open VideoCapture(0)")
                 camera = cv2.VideoCapture(0)
