@@ -27,7 +27,7 @@ const LogsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
-  const [gateFilter, setGateFilter] = useState("All Gates");
+  const [gateFilter, setGateFilter] = useState("Main Gate");
   const [roleFilter, setRoleFilter] = useState("All Roles");
 
   const fetchLogs = async () => {
@@ -223,12 +223,13 @@ const LogsPage = () => {
             <select
               value={gateFilter}
               onChange={(e) => setGateFilter(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:bg-white/10"
+              className="rounded-lg border border-white/10 bg-slate-800 px-4 py-2 text-sm text-white outline-none focus:bg-slate-700 transition-colors cursor-pointer appearance-none"
+              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'white\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1rem', paddingRight: '2.5rem' }}
             >
-              <option>All Gates</option>
-              <option>Main Gate</option>
-              <option>Back Gate</option>
-              <option>Service Gate</option>
+              <option value="All Gates" className="bg-slate-900 text-white">All Gates</option>
+              <option value="Main Gate" className="bg-slate-900 text-white">Main Gate</option>
+              <option value="Back Gate" className="bg-slate-900 text-white">Back Gate</option>
+              <option value="Service Gate" className="bg-slate-900 text-white">Service Gate</option>
             </select>
             <select
               value={roleFilter}

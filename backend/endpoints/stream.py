@@ -185,7 +185,7 @@ def log_plate_detection(plate_text: str, frame=None):
                 "plate_detected": plate_text,
                 "action": action, 
                 "status": "GRANTED" if status == "Authorized" else "DENIED",
-                "gate": "Main Gate Entry",
+                "gate": "Main Gate",
                 "timestamp": datetime.now().isoformat(),
                 "image_url": image_url
             }
