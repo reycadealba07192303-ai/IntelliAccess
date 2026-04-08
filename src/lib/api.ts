@@ -3,8 +3,9 @@
 // For fast local development, prefer local backend settings:
 // - VITE_USE_LOCAL_API=true (force local)
 // - VITE_LOCAL_API_URL=http://localhost:8000 (optional custom local URL)
-// Default is http://<current-hostname>:8000
-const DEFAULT_LOCAL_API_URL = `http://${window.location.hostname}:8000`;
+// - VITE_PI_API_URL=http://192.168.1.5:8000 (default Raspberry Pi backend URL)
+// Default is Raspberry Pi backend on 192.168.1.5:8000.
+const DEFAULT_LOCAL_API_URL = import.meta.env.VITE_PI_API_URL || `http://192.168.1.5:8000`;
 
 const shouldUseLocal = import.meta.env.VITE_USE_LOCAL_API === 'true';
 const localUrl = import.meta.env.VITE_LOCAL_API_URL || DEFAULT_LOCAL_API_URL;
