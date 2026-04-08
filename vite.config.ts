@@ -17,6 +17,13 @@ export default defineConfig({
     },
   },
 
+  server: {
+    watch: {
+      // Do not watch the Python virtual environment or other large backend folders.
+      ignored: ['**/backend/venv/**', '**/node_modules/**', '**/.git/**'],
+    },
+  },
+
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 })
