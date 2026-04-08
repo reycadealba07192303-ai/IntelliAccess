@@ -30,7 +30,7 @@ const CameraPage = () => {
     const [isAddingCamera, setIsAddingCamera] = useState(false);
     const [newCamera, setNewCamera] = useState({
         name: "",
-        location: "Main Gate",
+        location: "",
         url: `${API_BASE_URL}/live-feed`,
         status: "Live"
     });
@@ -63,7 +63,7 @@ const CameraPage = () => {
             });
             toast.success("Camera added successfully");
             setIsAddingCamera(false);
-            setNewCamera({ name: "", location: "Main Gate", url: `${API_BASE_URL}/live-feed`, status: "Live" });
+            setNewCamera({ name: "", location: "", url: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=800&auto=format&fit=crop", status: "Live" });
             fetchCameras();
         } catch (error) {
             toast.error("Failed to add camera");

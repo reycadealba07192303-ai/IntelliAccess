@@ -106,6 +106,31 @@ def log_plate_detection(plate_text: str, frame=None):
         if not vehicle:
              loose_regex = "[\\s\\-]*".join(list(search_plate))
              vehicle = vehicles_collection.find_one({"plate_number": {"$regex": loose_regex, "$options": "i"}})
+             
+        # Fuzzy Match Fallback for common AI OCR errors 
+        # (e.g. reading 1123VBC instead of 123VBC due to background noise)
+        if not vehicle:
+            import difflib
+            all_vehicles = list(vehicles_collection.find({}))
+            best_match = None
+            highest_ratio = 0.0
+            
+            for v in all_vehicles:
+                db_plate = v.get("plate_number", "").replace(" ", "").replace("-", "").upper()
+                if not db_plate:
+                    continue
+                
+                # SequenceMatcher returns a ratio from 0.0 (no match) to 1.0 (exact match)
+                ratio = difflib.SequenceMatcher(None, search_plate, db_plate).ratio()
+                
+                if ratio > highest_ratio:
+                    highest_ratio = ratio
+                    best_match = v
+                    
+            # A ratio of >= 0.70 allows for 1-2 character errors/noise on a typical 6-7 char plate
+            if highest_ratio >= 0.70 and best_match:
+                vehicle = best_match
+                print(f"[STREAM DETECT] AI OCR '{search_plate}' fuzzy matched to DB '{best_match.get('plate_number')}' (ratio {highest_ratio:.2f})")
         
         if vehicle:
             vehicle["id"] = str(vehicle["_id"])
@@ -172,61 +197,65 @@ def log_plate_detection(plate_text: str, frame=None):
                             action = "Exit"
                         else:
                             print(f"[STREAM DETECT] Ignored. Vehicle {plate_text} recently entered ({time_diff:.1f}s ago).")
-                            return
+                            action = "Ignored"
                     except Exception as e:
                         print(f"Time parsing error: {e}")
                 else:
                     action = "Exit"
                 
         # Insert access log
-        log_entry_id = None
+        log_entry_id = f"ignored_{int(current_time)}"
         try:
-            log_data = {
-                "plate_detected": plate_text,
-                "action": action, 
-                "status": "GRANTED" if status == "Authorized" else "DENIED",
-                "gate": "Main Gate",
-                "timestamp": datetime.now().isoformat(),
-                "image_url": image_url
-            }
-            
-            # Determine vehicle ID if authorized
-            if vehicle_info:
-                log_data["vehicle_id"] = vehicle_info.get("id")
+            if action != "Ignored":
+                log_data = {
+                    "plate_detected": plate_text,
+                    "action": action, 
+                    "status": "GRANTED" if status == "Authorized" else "DENIED",
+                    "gate": "Main Gate Entry",
+                    "timestamp": datetime.now().isoformat(),
+                    "image_url": image_url
+                }
                 
-            if status == "Authorized":
-                result = access_logs_collection.insert_one(log_data)
+                # Determine vehicle ID if authorized
+                if vehicle_info:
+                    log_data["vehicle_id"] = vehicle_info.get("id")
+                    
+                if status == "Authorized":
+                    result = access_logs_collection.insert_one(log_data)
+                else:
+                    result = denied_logs_collection.insert_one(log_data)
+                    
+                log_entry_id = str(result.inserted_id)
+                
+                # --- START SMS INTEGRATION ---
+                # If the entry was granted and we found a phone number, send the SMS
+                if status == "Authorized" and owner_phone and vehicle_info:
+                    owner_name = vehicle_info.get("owner_name", "Unknown")
+                    
+                    # Format time nicely for the SMS (e.g. 08:05 PM)
+                    current_time_str = datetime.now().strftime("%I:%M %p")
+                    
+                    # Added notification for the dashboard
+                    log_notification(
+                        title=f"Vehicle {action}",
+                        message=f"Your vehicle {plate_text} {action.lower()}ed the university at {current_time_str}.",
+                        user_id=vehicle_info.get("owner_id"),
+                        type="alert"
+                    )
+                    
+                    # Send SMS for both Entry and Exit
+                    print(f"[STREAM DETECT] Triggering {action} SMS to {owner_name} ({owner_phone})")
+                    send_access_sms(
+                        phone_number=owner_phone,
+                        owner_name=owner_name,
+                        plate_number=plate_text,
+                        time_str=current_time_str,
+                        action=action
+                    )
+                # --- END SMS INTEGRATION ---
             else:
-                result = denied_logs_collection.insert_one(log_data)
-                
-            log_entry_id = str(result.inserted_id)
-            
-            # --- START SMS INTEGRATION ---
-            # If the entry was granted and we found a phone number, send the SMS
-            if status == "Authorized" and owner_phone and vehicle_info:
-                owner_name = vehicle_info.get("owner_name", "Unknown")
-                
-                # Format time nicely for the SMS (e.g. 08:05 PM)
-                current_time_str = datetime.now().strftime("%I:%M %p")
-                
-                # Added notification for the dashboard
-                log_notification(
-                    title=f"Vehicle {action}",
-                    message=f"Your vehicle {plate_text} {action.lower()}ed the university at {current_time_str}.",
-                    user_id=vehicle_info.get("owner_id"),
-                    type="alert"
-                )
-                
-                # Send SMS for both Entry and Exit
-                print(f"[STREAM DETECT] Triggering {action} SMS to {owner_name} ({owner_phone})")
-                send_access_sms(
-                    phone_number=owner_phone,
-                    owner_name=owner_name,
-                    plate_number=plate_text,
-                    time_str=current_time_str,
-                    action=action
-                )
-            # --- END SMS INTEGRATION ---
+                status = "Cooldown Active"
+
             
         except Exception as e:
             print(f"Error saving log: {e}")

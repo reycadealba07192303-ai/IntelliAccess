@@ -190,7 +190,7 @@ def _process_rfid_tag(tag_id: str):
             "rfid_tag": tag_id,
             "action": action,
             "status": "GRANTED" if status == "Authorized" else "DENIED",
-            "gate": "Main Gate",
+            "gate": "Main Gate Entry",
             "method": "RFID",
             "timestamp": datetime.now().isoformat(),
             "image_url": None
