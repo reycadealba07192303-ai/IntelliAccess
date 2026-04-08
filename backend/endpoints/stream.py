@@ -323,14 +323,14 @@ def get_camera():
             camera = cv2.VideoCapture(0)
             if camera.isOpened():
                 print("Camera is opened! Warming up...")
-                else:
-                    print("Camera failed to open!")
-                # Warmup
-                time.sleep(2)
-                print("Camera warmup complete")
-            except Exception as e:
-                print(f"Error opening camera: {e}")
-                camera = None
+            else:
+                print("Camera failed to open!")
+            # Warmup
+            time.sleep(2)
+            print("Camera warmup complete")
+        except Exception as e:
+            print(f"Error opening camera: {e}")
+            camera = None
     return camera
 
 def generate_frames():
