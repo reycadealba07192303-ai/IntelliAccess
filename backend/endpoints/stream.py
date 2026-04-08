@@ -304,25 +304,25 @@ def get_camera():
         return None
         
     if camera is None:
-        if PICAMERA_AVAILABLE:
-            try:
-                print("Trying to initialize Raspberry Pi camera")
-                camera = PiCamera()
-                camera.resolution = (640, 480)
-                camera.start_preview()
-                time.sleep(2)
-                print("PiCamera initialized and warmed up")
-            except Exception as e:
-                print(f"Error initializing PiCamera: {e}")
-                camera = None
+        # Skip PiCamera initialization - using USB webcam directly
+        # if PICAMERA_AVAILABLE:
+        #     try:
+        #         print("Trying to initialize Raspberry Pi camera")
+        #         camera = PiCamera()
+        #         camera.resolution = (640, 480)
+        #         camera.start_preview()
+        #         time.sleep(2)
+        #         print("PiCamera initialized and warmed up")
+        #     except Exception as e:
+        #         print(f"Error initializing PiCamera: {e}")
+        #         camera = None
                 
-        if camera is None:
-            # Fallback to V4L2 generic camera (either native USB webcam or modern Pi Camera stack)
-            try:
-                print("Trying to open VideoCapture(0)")
-                camera = cv2.VideoCapture(0)
-                if camera.isOpened():
-                    print("Camera is opened! Warming up...")
+        # Fallback to V4L2 generic camera (USB webcam)
+        try:
+            print("Trying to open VideoCapture(0)")
+            camera = cv2.VideoCapture(0)
+            if camera.isOpened():
+                print("Camera is opened! Warming up...")
                 else:
                     print("Camera failed to open!")
                 # Warmup
