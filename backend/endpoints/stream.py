@@ -58,7 +58,7 @@ model = None
 reader = None
 
 # Detection settings
-DETECTION_INTERVAL = 30  # Run detection every 30 frames
+DETECTION_INTERVAL = 5  # Run detection every 5 frames (approx 0.3s)
 frame_counter = 0
 last_detections = []  # Store last detections to draw between intervals
 
@@ -69,7 +69,7 @@ ocr_worker_active = False
 # Cooldown tracking
 last_logged_plate = None
 last_logged_time = 0
-LOG_COOLDOWN_SECONDS = 30 # Wait 30 seconds before logging the exact same plate again
+LOG_COOLDOWN_SECONDS = 60 # Wait 60 seconds before logging the exact same plate again
 
 # Latest Scan Result for frontend polling
 latest_scan_result = None
@@ -486,11 +486,11 @@ def _ocr_background_worker():
             # Upscale 3x for clarity
             roi_up = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
             gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
-            denoised = cv2.fastNlMeansDenoising(gray_roi, h=10)
+            # Denoising removed for speed on Pi ARM CPU
 
-            _, thresh_otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            _, thresh_otsu = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             thresh_adapt = cv2.adaptiveThreshold(
-                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
+                gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
             )
             
             candidates = []
