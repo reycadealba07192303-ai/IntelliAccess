@@ -343,12 +343,77 @@ sudo kill -9 <PID>
 
 ---
 
-## Next Steps
+## 🌍 Deployment via Ngrok (100% Free - Recommended)
 
-- Set up SSL/HTTPS for remote access
-- Configure port forwarding for external access
-- Set up backup/logging system
-- Optimize performance for production use
+In order to securely expose the Raspberry Pi backend to the public internet so that your Vercel Frontend can communicate with the hardware Camera and RFID, we will use Ngrok. Ngrok provides a permanent, free static domain without needing to buy a custom domain name.
+
+### Prerequisites:
+1. **Ngrok Account:** Create a free account at [dashboard.ngrok.com](https://dashboard.ngrok.com).
+2. **Authtoken:** Go to **Getting Started > Your Authtoken** to copy your token.
+3. **Claim Static Domain:** Go to **Cloud Edge > Domains** and claim your 1 free static domain (e.g. `your-random-word.ngrok-free.app`).
+
+### Step 1: Install Ngrok on Raspberry Pi
+Open a terminal on your Pi and install Ngrok directly:
+```bash
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/keyrings/ngrok.asc >/dev/null \
+  && echo "deb [signed-by=/etc/apt/keyrings/ngrok.asc] https://ngrok-agent.s3.amazonaws.com buster main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update \
+  && sudo apt install ngrok
+```
+
+### Step 2: Link your Account
+Run this command to authenticate your Raspberry Pi with your Ngrok account (replace `<YOUR_AUTHTOKEN>`):
+```bash
+ngrok config add-authtoken <YOUR_AUTHTOKEN>
+```
+
+### Step 3: Test the Tunnel
+Test if the tunnel successfully connects to port 8000 (where our Python backend runs). Replace the domain with the one you claimed in the dashboard:
+```bash
+ngrok http --domain=your-static-domain.ngrok-free.app 8000
+```
+*If you see "Session Status: online" in green, it means your backend is now live on the internet! Press `Ctrl+C` to close it for now.*
+
+### Step 4: Run Ngrok as a Background Service
+To ensure the public link stays alive even if you close the terminal or restart the Raspberry Pi, we will create a background service.
+
+Create the service file:
+```bash
+sudo nano /etc/systemd/system/ngrok.service
+```
+
+Paste the following configuration (Replace the `--domain=` line with your exact domain):
+```ini
+[Unit]
+Description=Ngrok Tunnel Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/ngrok http --domain=your-static-domain.ngrok-free.app 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+*Save it with `Ctrl+X`, then `Y`, then `Enter`.*
+*(Note: If your Raspberry Pi username is not `pi`, change `User=pi` to your actual username, e.g. `User=intelliaacess`)*
+
+Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ngrok
+sudo systemctl start ngrok
+```
+
+### Done!
+Your Raspberry Pi Backend is now securely live on the internet!. 
+Before deploying your frontend to Vercel, simply set this environment variable:
+`VITE_PI_API_URL=https://your-static-domain.ngrok-free.app`
 
 ---
 
