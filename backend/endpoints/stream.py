@@ -20,18 +20,20 @@ except Exception as e:
     print(f"Warning: 'ultralytics' failed to load: {e}. Vehicle detection disabled.")
     AI_AVAILABLE = False
 
-# Force-disable AI on Raspberry Pi (PyTorch uses AVX2 which crashes on ARM)
+# Force-disable YOLO on Raspberry Pi ARM (PyTorch uses AVX2 which crashes on ARM)
 import platform
-if platform.machine().startswith('arm') or platform.machine().startswith('aarch'):
-    print("[CAMERA] ARM CPU detected. Disabling YOLO/EasyOCR (not compatible with this CPU).")
+_is_arm = platform.machine().startswith('arm') or platform.machine().startswith('aarch')
+if _is_arm:
+    print("[CAMERA] ARM CPU detected. Disabling YOLO (PyTorch not ARM-compatible).")
     AI_AVAILABLE = False
-    OCR_AVAILABLE = False
 
 try:
-    import easyocr
+    import pytesseract
+    import re as _re
     OCR_AVAILABLE = True
+    print("[CAMERA] Tesseract OCR available (ARM-compatible plate reading active).")
 except Exception as e:
-    print(f"Warning: 'easyocr' failed to load: {e}. License plate reading disabled.")
+    print(f"Warning: 'pytesseract' not installed: {e}. Install with: pip install pytesseract && sudo apt install tesseract-ocr")
     OCR_AVAILABLE = False
 
 try:
@@ -297,14 +299,7 @@ def load_models():
             print("YOLOv8 model loaded.")
         except Exception as e:
             print(f"Failed to load YOLO model: {e}")
-
-    if OCR_AVAILABLE and reader is None:
-        try:
-            print("Loading EasyOCR reader...")
-            reader = easyocr.Reader(['en'], gpu=False)
-            print("EasyOCR reader loaded.")
-        except Exception as e:
-            print(f"Failed to load EasyOCR: {e}")
+    # pytesseract needs no pre-loading - it's called per-frame directly
 
 def get_camera():
     global camera
@@ -407,68 +402,36 @@ def camera_background_task():
                     except Exception as e:
                         print(f"YOLO error: {e}")
                         
-                # 2. Run EasyOCR on the frame (text detection)
-                if reader:
+                # 2. Run Tesseract OCR on the frame (ARM-compatible plate reading)
+                if OCR_AVAILABLE:
                     try:
-                        # Use an allowlist to force the AI to ONLY detect uppercase letters and numbers.
-                        ocr_results = reader.readtext(frame, detail=1, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-                        valid_texts = []
-                        for result in ocr_results:
-                            bbox, text, conf = result
-                            if conf > 0.3:
-                                x1 = int(min([pt[0] for pt in bbox]))
-                                y1 = int(min([pt[1] for pt in bbox]))
-                                x2 = int(max([pt[0] for pt in bbox]))
-                                y2 = int(max([pt[1] for pt in bbox]))
-                                
-                                valid_texts.append({'box': (x1, y1, x2, y2), 'text': text})
-                                
-                        if valid_texts:
-                            # Group OCR text from left to right, somewhat ignoring minor vertical differences
-                            valid_texts.sort(key=lambda item: item['box'][0])
-                            
-                            groups = []
-                            for item in valid_texts:
-                                added = False
-                                for group in groups:
-                                    last_item = group[-1]
-                                    item_cy = (item['box'][1] + item['box'][3]) / 2
-                                    last_cy = (last_item['box'][1] + last_item['box'][3]) / 2
-                                    
-                                    if abs(item_cy - last_cy) < 50 and (item['box'][0] - last_item['box'][2]) < 200:
-                                        group.append(item)
-                                        added = True
-                                        break
-                                if not added:
-                                    groups.append([item])
-                                    
-                            for group in groups:
-                                group.sort(key=lambda x: x['box'][0])
-                                combined_text = "".join([item['text'] for item in group])
-                                
-                                import re
-                                clean_text = re.sub(r'[^A-Za-z0-9]', '', combined_text).upper()
-                                letters = re.sub(r'[^A-Z]', '', clean_text)
-                                numbers = re.sub(r'[^0-9]', '', clean_text)
-                                
-                                if len(letters) + len(numbers) >= 5:
-                                    display_text = clean_text
-                                    log_plate_detection(display_text, frame)
-                                    
-                                    min_x = min([item['box'][0] for item in group])
-                                    min_y = min([item['box'][1] for item in group])
-                                    max_x = max([item['box'][2] for item in group])
-                                    max_y = max([item['box'][3] for item in group])
-                                    
-                                    current_detections.append({
-                                        "box": (min_x, min_y, max_x, max_y),
-                                        "label": "", 
-                                        "color": (0, 255, 0),
-                                        "plate": f"{display_text}" 
-                                    })
-                                
+                        import re
+                        # Convert to grayscale + threshold for better OCR accuracy
+                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                        
+                        # Run Tesseract with plate-optimized config
+                        raw_text = pytesseract.image_to_string(
+                            thresh,
+                            config='--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                        )
+                        
+                        # Clean and validate
+                        clean_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
+                        letters = re.sub(r'[^A-Z]', '', clean_text)
+                        numbers = re.sub(r'[^0-9]', '', clean_text)
+                        
+                        if len(letters) + len(numbers) >= 5:
+                            log_plate_detection(clean_text, frame)
+                            h, w = frame.shape[:2]
+                            current_detections.append({
+                                "box": (int(w*0.1), int(h*0.3), int(w*0.9), int(h*0.7)),
+                                "label": "",
+                                "color": (0, 255, 0),
+                                "plate": clean_text
+                            })
                     except Exception as e:
-                        print(f"OCR error: {e}")
+                        print(f"Tesseract OCR error: {e}")
                         
                 last_detections = current_detections
                 
