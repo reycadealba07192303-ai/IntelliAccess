@@ -475,8 +475,8 @@ def _ocr_background_worker():
         re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
     ]
     
-    # Require same plate to be read 2 times consecutively to avoid misread artifacts
-    consecutive_reads = deque(maxlen=2)
+    # Require same plate to be read 2 times out of the last 3 frames for consensus
+    read_buffer = deque(maxlen=3)
     
     while ocr_worker_active:
         try:
@@ -527,13 +527,13 @@ def _ocr_background_worker():
                         break
 
             if best_plate:
-                consecutive_reads.append(best_plate)
+                read_buffer.append(best_plate)
                 
-                # Assert consensus: only log if the last 2 reads agree completely
-                if len(consecutive_reads) == 2 and len(set(consecutive_reads)) == 1:
+                # Assert consensus: 2 out of 3 recent reads must match
+                if read_buffer.count(best_plate) >= 2:
                     print(f"[OCR] ✅ Plate consensus achieved: {best_plate}")
                     log_plate_detection(best_plate, frame) 
-                    consecutive_reads.clear() # clear buffer after logging buffer
+                    read_buffer.clear() # clear buffer after logging
                 else:
                     print(f"[OCR] Pending consensus: saw {best_plate}, waiting for match...")
         except queue.Empty:
