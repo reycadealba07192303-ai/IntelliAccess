@@ -94,7 +94,8 @@ const CameraPage = () => {
     const lastRfidScanIdRef = useRef<string | null>(null);
     const [rfidStatus, setRfidStatus] = useState<{connected: boolean, polling: boolean}>({connected: false, polling: false});
     const [isStreaming, setIsStreaming] = useState(false);
-    const [frameTimestamp, setFrameTimestamp] = useState<number>(0);
+    const [streamSrc, setStreamSrc] = useState<string | null>(null);
+    const streamSrcRef = useRef<string | null>(null);
     const scanningRef = useRef(false);
 
     const SCAN_INTERVAL_MS = 1000;
@@ -124,11 +125,29 @@ const CameraPage = () => {
         if (selectedCamera === 1) {
             setIsStreaming(true);
 
-            // Refresh frame timestamp every 100ms to cache-bust the img src
-            streamInterval = setInterval(() => {
+            // Fetch snapshots via fetch() so we can pass the ngrok-skip-browser-warning header
+            streamInterval = setInterval(async () => {
                 if (!isMounted) return;
-                setFrameTimestamp(Date.now());
-            }, 100); // 10 FPS
+                try {
+                    const res = await fetch(`${API_BASE_URL}/snapshot`, {
+                        headers: { 'ngrok-skip-browser-warning': 'true' },
+                        cache: 'no-store'
+                    });
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        if (blob.size > 100) { // >100 bytes means actual JPEG data, not empty
+                            const newUrl = URL.createObjectURL(blob);
+                            setStreamSrc(prev => {
+                                if (streamSrcRef.current) URL.revokeObjectURL(streamSrcRef.current);
+                                streamSrcRef.current = newUrl;
+                                return newUrl;
+                            });
+                        }
+                    }
+                } catch (err) {
+                    // silently retry
+                }
+            }, 500); // 2 FPS - keeps Pi load manageable
 
             if (isAutoScanning) {
                 // Poll the backend's /latest-scan endpoint every second
@@ -193,7 +212,7 @@ const CameraPage = () => {
             }
         } else {
             setIsStreaming(false);
-            setFrameTimestamp(0);
+            setStreamSrc(null);
         }
 
         return () => {
@@ -286,16 +305,15 @@ const CameraPage = () => {
                         <div className="relative aspect-video bg-black">
                             {selectedCamera === 1 ? (
                                 <>
-                                    {frameTimestamp > 0 ? (
+                                    {streamSrc ? (
                                         <img
                                             ref={imgRef}
-                                            src={`${API_BASE_URL}/snapshot?t=${frameTimestamp}`}
+                                            src={streamSrc}
                                             alt="Raspberry Pi Camera Feed"
                                             className="w-full h-full object-cover"
-                                            onError={() => setFrameTimestamp(0)}
                                         />
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 border border-slate-800">
+                                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900">
                                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500/20 border-t-emerald-500 mb-4" />
                                             <p className="text-slate-500 text-sm animate-pulse">Connecting to hardware feed...</p>
                                         </div>
