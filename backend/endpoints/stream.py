@@ -484,6 +484,15 @@ def camera_background_task():
 def start_camera_thread():
     camera_thread = threading.Thread(target=camera_background_task, daemon=True)
     camera_thread.start()
+    print("[CAMERA] Background AI thread started.")
+
+_camera_started = False
+
+def ensure_camera_started():
+    global _camera_started
+    if not _camera_started:
+        _camera_started = True
+        start_camera_thread()
 
 def stream_mjpeg():
     while True:
@@ -496,10 +505,12 @@ from fastapi import Response
 
 @router.get("/live-feed")
 async def live_feed():
+    ensure_camera_started()
     return StreamingResponse(stream_mjpeg(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 @router.get("/snapshot")
 async def snapshot():
+    ensure_camera_started()
     if latest_frame_bytes is None:
         return Response(content=b"", media_type="image/jpeg")
     return Response(content=latest_frame_bytes, media_type="image/jpeg")

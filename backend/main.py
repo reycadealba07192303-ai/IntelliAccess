@@ -62,8 +62,7 @@ app.include_router(cameras.router, prefix="/cameras", tags=["Cameras"])
 @app.on_event("startup")
 async def startup_event():
     """Initializes hardware background workers when the server starts."""
-    from endpoints.stream import start_camera_thread
-    start_camera_thread()
+    # Camera AI thread is started lazily on first /live-feed or /snapshot request
     if RFID_AVAILABLE:
         try:
             from utils.rfid import start_rfid_background_polling
