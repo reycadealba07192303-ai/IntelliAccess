@@ -174,8 +174,10 @@ def _process_rfid_tag(tag_id: str):
                     try:
                         last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
-                        if time_diff > 60:
+                        if 60 < time_diff < 43200: # Between 1 minute and 12 hours -> natural Exit
                             action = "Exit"
+                        elif time_diff >= 43200: # Greater than 12 hours -> Assumed to be new day Entry
+                            action = "Entry"
                         else:
                             print(f"[RFID] Ignored. Vehicle recently entered ({time_diff:.1f}s ago).")
                             return

@@ -214,13 +214,16 @@ def log_plate_detection(plate_text: str, frame=None):
                     try:
                         last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
-                        if time_diff > 60:
+                        if 60 < time_diff < 43200: # Between 1 minute and 12 hours -> natural Exit
                             action = "Exit"
+                        elif time_diff >= 43200: # Greater than 12 hours -> assumed to be a new day Entry
+                            action = "Entry"
                         else:
                             print(f"[STREAM DETECT] Ignored. Vehicle {plate_text} recently entered ({time_diff:.1f}s ago).")
                             action = "Ignored"
                     except Exception as e:
                         print(f"Time parsing error: {e}")
+                        action = "Exit"
                 else:
                     action = "Exit"
                 
@@ -464,12 +467,16 @@ def _ocr_background_worker():
     global last_detections, frame_counter
     print("[OCR WORKER] Background OCR thread started.")
     import re
+    from collections import deque
     
     ph_patterns = [
         re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
         re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
         re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
     ]
+    
+    # Require same plate to be read 2 times consecutively to avoid misread artifacts
+    consecutive_reads = deque(maxlen=2)
     
     while ocr_worker_active:
         try:
@@ -520,9 +527,15 @@ def _ocr_background_worker():
                         break
 
             if best_plate:
-                print(f"[OCR] ✅ Plate detected asynchronously: {best_plate}")
-                # We log it. We use the most recent frame visually available.
-                log_plate_detection(best_plate, frame) 
+                consecutive_reads.append(best_plate)
+                
+                # Assert consensus: only log if the last 2 reads agree completely
+                if len(consecutive_reads) == 2 and len(set(consecutive_reads)) == 1:
+                    print(f"[OCR] ✅ Plate consensus achieved: {best_plate}")
+                    log_plate_detection(best_plate, frame) 
+                    consecutive_reads.clear() # clear buffer after logging buffer
+                else:
+                    print(f"[OCR] Pending consensus: saw {best_plate}, waiting for match...")
         except queue.Empty:
             continue
         except Exception as e:
