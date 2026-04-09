@@ -101,6 +101,7 @@ def log_plate_detection(plate_text: str, frame=None):
     if len(plate_text.replace(" ", "")) < 2:
         return
         
+    current_time = time.time()
     # Update frontend polling object REGARDLESS of cooldown
     # This provides the "Live Green Box" indicator
     latest_scan_result = {
