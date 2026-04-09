@@ -304,35 +304,47 @@ def get_camera():
     if not OPENCV_AVAILABLE:
         return None
         
-    if camera is None:
-        # Skip PiCamera initialization - using USB webcam directly
-        # if PICAMERA_AVAILABLE:
-        #     try:
-        #         print("Trying to initialize Raspberry Pi camera")
-        #         camera = PiCamera()
-        #         camera.resolution = (640, 480)
-        #         camera.start_preview()
-        #         time.sleep(2)
-        #         print("PiCamera initialized and warmed up")
-        #     except Exception as e:
-        #         print(f"Error initializing PiCamera: {e}")
-        #         camera = None
-                
-        # Fallback to V4L2 generic camera (USB webcam)
+    if camera is not None and hasattr(camera, 'isOpened') and camera.isOpened():
+        return camera
+
+    # Try V4L2 backend explicitly (required on Raspberry Pi Linux)
+    for device_index in [0, 1, 2]:
         try:
-            print("Trying to open VideoCapture(0)")
-            camera = cv2.VideoCapture(0)
-            if camera.isOpened():
-                print("Camera is opened! Warming up...")
+            print(f"Trying to open VideoCapture({device_index}) with V4L2 backend...")
+            # Try V4L2 first (Linux native), fallback to auto
+            cam = cv2.VideoCapture(device_index, cv2.CAP_V4L2)
+            if not cam.isOpened():
+                cam = cv2.VideoCapture(device_index)
+            
+            if cam.isOpened():
+                # Force resolution to avoid driver negotiation hangs
+                cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cam.set(cv2.CAP_PROP_FPS, 15)
+                cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                # Drain initial blank frames (common with USB cams)
+                print("Camera is opened! Draining initial frames...")
+                for _ in range(10):
+                    cam.grab()
+                    time.sleep(0.05)
+                
+                # Verify actual frame data
+                ret, test_frame = cam.read()
+                if ret and test_frame is not None:
+                    print(f"Camera warmup complete (device {device_index}, frame shape: {test_frame.shape})")
+                    camera = cam
+                    return camera
+                else:
+                    print(f"Device {device_index} opened but returned no frame data, trying next...")
+                    cam.release()
             else:
-                print("Camera failed to open!")
-            # Warmup
-            time.sleep(2)
-            print("Camera warmup complete")
+                print(f"Device {device_index} could not be opened.")
         except Exception as e:
-            print(f"Error opening camera: {e}")
-            camera = None
-    return camera
+            print(f"Error opening device {device_index}: {e}")
+
+    print("All camera devices failed to provide usable frames!")
+    return None
 
 def camera_background_task():
     global frame_counter, last_detections, latest_frame_bytes
