@@ -20,6 +20,13 @@ except Exception as e:
     print(f"Warning: 'ultralytics' failed to load: {e}. Vehicle detection disabled.")
     AI_AVAILABLE = False
 
+# Force-disable AI on Raspberry Pi (PyTorch uses AVX2 which crashes on ARM)
+import platform
+if platform.machine().startswith('arm') or platform.machine().startswith('aarch'):
+    print("[CAMERA] ARM CPU detected. Disabling YOLO/EasyOCR (not compatible with this CPU).")
+    AI_AVAILABLE = False
+    OCR_AVAILABLE = False
+
 try:
     import easyocr
     OCR_AVAILABLE = True
@@ -359,8 +366,8 @@ def camera_background_task():
         print("Camera not available. Background task stopped.")
         return
 
-    print("[CAMERA] Raw capture started. AI models will load in 15 seconds...")
-    ai_load_time = time.time() + 15  # Load AI after 15s delay
+    print("[CAMERA] Raw capture started. AI disabled on ARM (use x86 server for AI detection).")
+    ai_load_time = time.time() + 9999  # Never load AI on Pi
     ai_loaded = False
 
     while True:
