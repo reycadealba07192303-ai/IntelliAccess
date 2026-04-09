@@ -73,6 +73,13 @@ latest_frame_bytes = None  # Global buffer for the latest JPEG frame
 
 import os
 from utils.sms import send_access_sms
+try:
+    from utils.buzzer import buzz_granted, buzz_denied
+    BUZZER_AVAILABLE = True
+except Exception:
+    BUZZER_AVAILABLE = False
+    def buzz_granted(): pass
+    def buzz_denied(): pass
 
 def log_plate_detection(plate_text: str, frame=None):
     global last_logged_plate, last_logged_time, latest_scan_result
@@ -270,6 +277,13 @@ def log_plate_detection(plate_text: str, frame=None):
         except Exception as e:
             print(f"Error saving log: {e}")
         
+        # Fire buzzer based on access result
+        if BUZZER_AVAILABLE:
+            if status == "Authorized":
+                buzz_granted()
+            else:
+                buzz_denied()
+        
         print(f"\n[STREAM DETECT] Logged Plate: {plate_text} | Status: {status}")
         
         # Update frontend polling object
@@ -361,9 +375,7 @@ def camera_background_task():
         print("Camera not available. Background task stopped.")
         return
 
-    print("[CAMERA] Raw capture started. AI disabled on ARM (use x86 server for AI detection).")
-    ai_load_time = time.time() + 9999  # Never load AI on Pi
-    ai_loaded = False
+    print("[CAMERA] Raw capture started. Tesseract OCR is active for plate detection.")
 
     while True:
         try:
@@ -372,14 +384,8 @@ def camera_background_task():
                 time.sleep(0.1)
                 continue
 
-            # Lazy load AI models after delay (non-blocking check)
-            if not ai_loaded and time.time() > ai_load_time:
-                ai_loaded = True
-                load_models()
-                print("[CAMERA] AI models loaded. Detection is now active.")
-
-            # Run detection every DETECTION_INTERVAL frames only if AI is loaded
-            if ai_loaded and frame_counter % DETECTION_INTERVAL == 0:
+            # Run detection every DETECTION_INTERVAL frames
+            if frame_counter % DETECTION_INTERVAL == 0:
                 current_detections = []
                 
                 # 1. Run YOLOv8 on the frame (general object detection)
