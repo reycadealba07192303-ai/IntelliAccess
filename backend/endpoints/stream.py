@@ -408,34 +408,83 @@ def camera_background_task():
                     except Exception as e:
                         print(f"YOLO error: {e}")
                         
-                # 2. Run Tesseract OCR on the frame (ARM-compatible plate reading)
+                # 2. Run Tesseract OCR — focused on center ROI with Philippine plate validation
                 if OCR_AVAILABLE:
                     try:
                         import re
-                        # Convert to grayscale + threshold for better OCR accuracy
-                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                        h, w = frame.shape[:2]
+
+                        # === STEP 1: Crop center ROI (where plate is most likely) ===
+                        # Focus on middle 60% horizontally, middle 50% vertically
+                        y1_roi = int(h * 0.25)
+                        y2_roi = int(h * 0.75)
+                        x1_roi = int(w * 0.10)
+                        x2_roi = int(w * 0.90)
+                        roi = frame[y1_roi:y2_roi, x1_roi:x2_roi]
+
+                        # === STEP 2: Upscale 3x for better OCR on small plates ===
+                        scale = 3
+                        roi_up = cv2.resize(roi, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+                        # === STEP 3: Try multiple preprocessing methods ===
+                        gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
                         
-                        # Run Tesseract with plate-optimized config
-                        raw_text = pytesseract.image_to_string(
-                            thresh,
-                            config='--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                        # Denoise
+                        denoised = cv2.fastNlMeansDenoising(gray_roi, h=10)
+
+                        # Method A: Otsu threshold
+                        _, thresh_otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+                        # Method B: Adaptive threshold (better for uneven lighting)
+                        thresh_adapt = cv2.adaptiveThreshold(
+                            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                            cv2.THRESH_BINARY, 31, 2
                         )
-                        
-                        # Clean and validate
-                        clean_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
-                        letters = re.sub(r'[^A-Z]', '', clean_text)
-                        numbers = re.sub(r'[^0-9]', '', clean_text)
-                        
-                        if len(letters) + len(numbers) >= 5:
-                            log_plate_detection(clean_text, frame)
-                            h, w = frame.shape[:2]
+
+                        # Method C: Inverted Otsu (for dark-text-on-light plates)
+                        thresh_inv = cv2.bitwise_not(thresh_otsu)
+
+                        tesseract_cfg = '--psm 8 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+                        candidates = []
+                        for img_variant in [thresh_otsu, thresh_adapt, thresh_inv, denoised]:
+                            raw = pytesseract.image_to_string(img_variant, config=tesseract_cfg)
+                            cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                            if cleaned:
+                                candidates.append(cleaned)
+
+                        # === STEP 4: Validate Philippine plate format ===
+                        # Valid: 3 letters + 3 digits (ABC123) or 3 letters + 4 digits (ABC1234)
+                        ph_plate_pattern = re.compile(r'^[A-Z]{2,3}[\s\-]?\d{3,4}$')
+
+                        best_plate = None
+                        for candidate in candidates:
+                            # Try direct match first
+                            if ph_plate_pattern.match(candidate):
+                                best_plate = candidate
+                                break
+
+                        # Fallback: if no perfect match, try extracting plate-like substrings
+                        if not best_plate:
+                            for candidate in candidates:
+                                # Look for 3-letter + 3-4 digit pattern anywhere in the string
+                                match = re.search(r'([A-Z]{2,3})(\d{3,4})', candidate)
+                                if match:
+                                    best_plate = match.group(1) + match.group(2)
+                                    break
+
+                        if best_plate:
+                            print(f"[OCR] Plate detected: {best_plate} (from candidates: {candidates})")
+                            log_plate_detection(best_plate, frame)
                             current_detections.append({
-                                "box": (int(w*0.1), int(h*0.3), int(w*0.9), int(h*0.7)),
+                                "box": (x1_roi, y1_roi, x2_roi, y2_roi),
                                 "label": "",
                                 "color": (0, 255, 0),
-                                "plate": clean_text
+                                "plate": best_plate
                             })
+                        else:
+                            print(f"[OCR] No valid plate found. Candidates: {candidates}")
+
                     except Exception as e:
                         print(f"Tesseract OCR error: {e}")
                         
