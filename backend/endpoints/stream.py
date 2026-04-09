@@ -475,36 +475,29 @@ def _ocr_background_worker():
         re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
     ]
     
-    # Require same plate to be read 2 times out of the last 3 frames for consensus
-    read_buffer = deque(maxlen=3)
+    # Instant Speed Mode: No consensus buffer needed. Log on first valid detection.
     
     while ocr_worker_active:
         try:
             # Wait for an ROI image to appear in the queue
             frame, roi = ocr_queue.get(timeout=1)
-            
-            # Upscale 3x for clarity
-            roi_up = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+                        # Upscale 2x for speed vs accuracy balance on Pi
+            roi_up = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
             gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
-            # Denoising removed for speed on Pi ARM CPU
-
-            _, thresh_otsu = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            thresh_adapt = cv2.adaptiveThreshold(
-                gray_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
-            )
+            
+            # Single pass Otsu Threshold (fastest reliable method)
+            _, thresh = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             
             candidates = []
-            
-            # Use PSM 7 (fast single-line)
             cfg = '--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-            for img_v in [thresh_otsu, thresh_adapt]:
-                try:
-                    raw = pytesseract.image_to_string(img_v, config=cfg)
-                    cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
-                    if cleaned and len(cleaned) >= 5:
-                        candidates.append(cleaned)
-                except Exception:
-                    pass
+            try:
+                raw = pytesseract.image_to_string(thresh, config=cfg)
+                cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                if cleaned and len(cleaned) >= 5:
+                    candidates.append(cleaned)
+            except Exception:
+                pass
+
 
             best_plate = None
             for candidate in candidates:
@@ -527,15 +520,8 @@ def _ocr_background_worker():
                         break
 
             if best_plate:
-                read_buffer.append(best_plate)
-                
-                # Assert consensus: 2 out of 3 recent reads must match
-                if read_buffer.count(best_plate) >= 2:
-                    print(f"[OCR] ✅ Plate consensus achieved: {best_plate}")
-                    log_plate_detection(best_plate, frame) 
-                    read_buffer.clear() # clear buffer after logging
-                else:
-                    print(f"[OCR] Pending consensus: saw {best_plate}, waiting for match...")
+                print(f"[OCR] ✅ Instant Detection: {best_plate}")
+                log_plate_detection(best_plate, frame) 
         except queue.Empty:
             continue
         except Exception as e:

@@ -329,34 +329,7 @@ const CameraPage = () => {
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
                                     
                                     {/* Scanning Target Box with Live Status */}
-                                    {isAutoScanning && (
-                                         <div className={`absolute top-[30%] bottom-[30%] left-[20%] right-[20%] border-2 border-dashed rounded-xl pointer-events-none flex flex-col items-center justify-center transition-colors duration-300 ${
-                                            scanStatus === 'scanning' ? 'border-amber-400/60 bg-amber-500/10 shadow-[0_0_20px_rgba(251,191,36,0.2)_inset]' :
-                                            scanStatus === 'found' ? 'border-emerald-500 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)_inset] scale-[1.02]' :
-                                            scanStatus === 'empty' ? 'border-red-400/60 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.2)_inset]' :
-                                            'border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.2)_inset]'
-                                         }`}>
-                                             
-                                             <div className="absolute -top-3 px-3 py-1 bg-black/80 text-white text-[10px] font-mono tracking-widest rounded-full border border-white/20 whitespace-nowrap">
-                                                {scanStatus === 'scanning' ? `SCANNING FRAME #${scanCount + 1}...` :
-                                                 scanStatus === 'found' ? `PLATE DETECTED ✓` :
-                                                 scanStatus === 'empty' ? `NO PLATE DETECTED` :
-                                                 `POSITION PLATE HERE`}
-                                             </div>
-                                             
-                                             <span className={`font-bold tracking-widest text-xs px-4 py-1.5 rounded-full border transition-all duration-300 ${
-                                                scanStatus === 'scanning' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(251,191,36,0.5)]' :
-                                                scanStatus === 'found' ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-110' :
-                                                scanStatus === 'empty' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                                'bg-black/60 text-emerald-400 border-emerald-500/30'
-                                             }`}>
-                                                {scanStatus === 'scanning' ? 'ANALYZING...' :
-                                                 scanStatus === 'found' ? 'SUCCESS' :
-                                                 scanStatus === 'empty' ? 'RETRYING' :
-                                                 'AI READY'}
-                                             </span>
-                                         </div>
-                                    )}
+
 
                                     {/* Live OCR boxes (from last detected plate) */}
                                     {plateOverlay && (
