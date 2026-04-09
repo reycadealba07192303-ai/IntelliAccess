@@ -62,6 +62,10 @@ DETECTION_INTERVAL = 30  # Run detection every 30 frames
 frame_counter = 0
 last_detections = []  # Store last detections to draw between intervals
 
+import queue
+ocr_queue = queue.Queue(maxsize=1) # Only store latest frame for OCR to avoid backlog
+ocr_worker_active = False
+
 # Cooldown tracking
 last_logged_plate = None
 last_logged_time = 0
@@ -421,78 +425,15 @@ def camera_background_task():
                         x2_roi = int(w * 0.95)
                         roi = frame[y1_roi:y2_roi, x1_roi:x2_roi]
 
-                        # === STEP 2: Upscale 3x ===
-                        roi_up = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-                        gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
-                        denoised = cv2.fastNlMeansDenoising(gray_roi, h=10)
+                        if not ocr_queue.full():
+                            # Pass a copy of the ROI to avoid memory corruption across threads
+                            ocr_queue.put(roi.copy())
 
-                        _, thresh_otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                        thresh_adapt = cv2.adaptiveThreshold(
-                            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
-                        )
-                        thresh_inv = cv2.bitwise_not(thresh_otsu)
 
                         candidates = []
-                        # Try PSM 7 (single line) and PSM 11 (sparse text) - best for plates
-                        for psm in [7, 11, 6, 13]:
-                            cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                            for img_v in [thresh_otsu, thresh_adapt, thresh_inv, denoised]:
-                                try:
-                                    raw = pytesseract.image_to_string(img_v, config=cfg)
-                                    cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
-                                    if cleaned and len(cleaned) >= 5:
-                                        candidates.append(cleaned)
-                                except Exception:
-                                    pass
-
-                        # === STEP 3: Validate — accept BOTH Philippine plate formats ===
-                        # Format A: ABC123 or ABC1234 (letters first)
-                        # Format B: 123VBC or 1234ABC (digits first) — also valid
-                        ph_patterns = [
-                            re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   # ABC123, ABC1234
-                            re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   # 123VBC, 1234ABC
-                            re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'),  # wider fallback
-                        ]
-
-                        best_plate = None
-                        # Try exact match first
-                        for candidate in candidates:
-                            for pattern in ph_patterns:
-                                if pattern.match(candidate):
-                                    best_plate = candidate
-                                    break
-                            if best_plate:
-                                break
-
-                        # Fuzzy fallback: extract plate-like substrings
-                        if not best_plate:
-                            for candidate in candidates:
-                                # Letters then digits
-                                m = re.search(r'([A-Z]{2,3})(\d{3,4})', candidate)
-                                if m:
-                                    best_plate = m.group(1) + m.group(2)
-                                    break
-                                # Digits then letters
-                                m = re.search(r'(\d{3,4})([A-Z]{2,3})', candidate)
-                                if m:
-                                    best_plate = m.group(1) + m.group(2)
-                                    break
-
-                        if best_plate:
-                            print(f"[OCR] ✅ Plate detected: {best_plate}")
-                            log_plate_detection(best_plate, frame)
-                            current_detections.append({
-                                "box": (x1_roi, y1_roi, x2_roi, y2_roi),
-                                "label": "",
-                                "color": (0, 255, 0),
-                                "plate": best_plate
-                            })
-                        else:
-                            if candidates:
-                                print(f"[OCR] ❌ No valid plate format. Raw candidates: {list(set(candidates))[:5]}")
-
                     except Exception as e:
-                        print(f"Tesseract OCR error: {e}")
+                        print(f"Queue error: {e}")
+
 
                 last_detections = current_detections
                 
@@ -519,10 +460,87 @@ def camera_background_task():
             print(f"Stream error: {e}")
             time.sleep(1)
 
+def _ocr_background_worker():
+    global last_detections, frame_counter
+    print("[OCR WORKER] Background OCR thread started.")
+    import re
+    
+    ph_patterns = [
+        re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
+        re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
+        re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
+    ]
+    
+    while ocr_worker_active:
+        try:
+            # Wait for an ROI image to appear in the queue
+            roi = ocr_queue.get(timeout=1)
+            
+            # Upscale 3x for clarity
+            roi_up = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+            gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
+            denoised = cv2.fastNlMeansDenoising(gray_roi, h=10)
+
+            _, thresh_otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            thresh_adapt = cv2.adaptiveThreshold(
+                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
+            )
+            
+            candidates = []
+            
+            # Use PSM 7 (fast single-line)
+            cfg = '--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            for img_v in [thresh_otsu, thresh_adapt]:
+                try:
+                    raw = pytesseract.image_to_string(img_v, config=cfg)
+                    cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                    if cleaned and len(cleaned) >= 5:
+                        candidates.append(cleaned)
+                except Exception:
+                    pass
+
+            best_plate = None
+            for candidate in candidates:
+                for pattern in ph_patterns:
+                    if pattern.match(candidate):
+                        best_plate = candidate
+                        break
+                if best_plate:
+                    break
+
+            if not best_plate:
+                for candidate in candidates:
+                    m = re.search(r'([A-Z]{2,3})(\d{3,4})', candidate)
+                    if m:
+                        best_plate = m.group(1) + m.group(2)
+                        break
+                    m = re.search(r'(\d{3,4})([A-Z]{2,3})', candidate)
+                    if m:
+                        best_plate = m.group(1) + m.group(2)
+                        break
+
+            if best_plate:
+                print(f"[OCR] ✅ Plate detected asynchronously: {best_plate}")
+                # We log it. We use the most recent frame visually available.
+                log_plate_detection(best_plate, None) 
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"[OCR WORKER] Error: {e}")
+
 def start_camera_thread():
+    global ocr_worker_active
+    ocr_worker_active = True
+    
     camera_thread = threading.Thread(target=camera_background_task, daemon=True)
     camera_thread.start()
-    print("[CAMERA] Background AI thread started.")
+    
+    if OCR_AVAILABLE:
+        ocr_thread = threading.Thread(target=_ocr_background_worker, daemon=True)
+        ocr_thread.start()
+        
+    print("[CAMERA] Background threads started.")
+
 
 _camera_started = False
 
