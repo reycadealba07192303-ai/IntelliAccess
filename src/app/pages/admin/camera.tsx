@@ -94,7 +94,7 @@ const CameraPage = () => {
     const lastRfidScanIdRef = useRef<string | null>(null);
     const [rfidStatus, setRfidStatus] = useState<{connected: boolean, polling: boolean}>({connected: false, polling: false});
     const [isStreaming, setIsStreaming] = useState(false);
-    const [streamFrame, setStreamFrame] = useState<string | null>(null);
+    const [frameTimestamp, setFrameTimestamp] = useState<number>(0);
     const scanningRef = useRef(false);
 
     const SCAN_INTERVAL_MS = 1000;
@@ -124,26 +124,10 @@ const CameraPage = () => {
         if (selectedCamera === 1) {
             setIsStreaming(true);
 
-            // Fetch video frames manually to bypass Ngrok constraints
-            streamInterval = setInterval(async () => {
+            // Refresh frame timestamp every 100ms to cache-bust the img src
+            streamInterval = setInterval(() => {
                 if (!isMounted) return;
-                try {
-                    const res = await fetch(`${API_BASE_URL}/snapshot`, {
-                        headers: { 'ngrok-skip-browser-warning': 'true' }
-                    });
-                    if (res.ok) {
-                        const blob = await res.blob();
-                        if (blob.size > 0) {
-                            const objectUrl = URL.createObjectURL(blob);
-                            setStreamFrame(prev => {
-                                if (prev) URL.revokeObjectURL(prev);
-                                return objectUrl;
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.error("Frame fetch error:", err);
-                }
+                setFrameTimestamp(Date.now());
             }, 100); // 10 FPS
 
             if (isAutoScanning) {
@@ -209,7 +193,7 @@ const CameraPage = () => {
             }
         } else {
             setIsStreaming(false);
-            setStreamFrame(null);
+            setFrameTimestamp(0);
         }
 
         return () => {
@@ -302,12 +286,13 @@ const CameraPage = () => {
                         <div className="relative aspect-video bg-black">
                             {selectedCamera === 1 ? (
                                 <>
-                                    {streamFrame ? (
+                                    {frameTimestamp > 0 ? (
                                         <img
                                             ref={imgRef}
-                                            src={streamFrame}
+                                            src={`${API_BASE_URL}/snapshot?t=${frameTimestamp}`}
                                             alt="Raspberry Pi Camera Feed"
                                             className="w-full h-full object-cover"
+                                            onError={() => setFrameTimestamp(0)}
                                         />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 border border-slate-800">
