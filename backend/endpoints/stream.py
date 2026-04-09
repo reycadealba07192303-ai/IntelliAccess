@@ -60,6 +60,7 @@ LOG_COOLDOWN_SECONDS = 30 # Wait 30 seconds before logging the exact same plate 
 
 # Latest Scan Result for frontend polling
 latest_scan_result = None
+latest_frame_bytes = None  # Global buffer for the latest JPEG frame
 
 import os
 from utils.sms import send_access_sms
@@ -333,13 +334,11 @@ def get_camera():
             camera = None
     return camera
 
-def generate_frames():
-    global frame_counter, last_detections
+def camera_background_task():
+    global frame_counter, last_detections, latest_frame_bytes
     
     if not OPENCV_AVAILABLE:
-        # Yield a placeholder image or nothing if no opencv
-        yield (b'--frame\r\n'
-               b'Content-Type: text/plain\r\n\r\n' + b'OpenCV not installed' + b'\r\n')
+        print("OpenCV not installed. Camera background task stopped.")
         return
 
     # Ensure models are loaded (lazy loading)
@@ -348,11 +347,10 @@ def generate_frames():
     cam = get_camera()
     
     if cam is None or (hasattr(cam, 'isOpened') and not cam.isOpened()):
-         # Yield a placeholder or error frame
-        yield (b'--frame\r\n'
-               b'Content-Type: text/plain\r\n\r\n' + b'Camera not available' + b'\r\n')
+        print("Camera not available. Background task stopped.")
         return
 
+    print("Camera background task started. AI scanning is active.")
     while True:
         try:
             if hasattr(cam, 'capture'):
@@ -368,7 +366,8 @@ def generate_frames():
                 # VideoCapture
                 success, frame = cam.read()
             if not success:
-                break
+                time.sleep(1)
+                continue
             
             # Run detection every DETECTION_INTERVAL frames
             if frame_counter % DETECTION_INTERVAL == 0:
@@ -398,7 +397,6 @@ def generate_frames():
                 if reader:
                     try:
                         # Use an allowlist to force the AI to ONLY detect uppercase letters and numbers.
-                        # This massively increases accuracy for license plates and stops it from hallucinating symbols or lowercase letters.
                         ocr_results = reader.readtext(frame, detail=1, allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
                         valid_texts = []
                         for result in ocr_results:
@@ -413,7 +411,6 @@ def generate_frames():
                                 
                         if valid_texts:
                             # Group OCR text from left to right, somewhat ignoring minor vertical differences
-                            # Sort by X-coordinate first to ensure left-to-right order
                             valid_texts.sort(key=lambda item: item['box'][0])
                             
                             groups = []
@@ -424,7 +421,6 @@ def generate_frames():
                                     item_cy = (item['box'][1] + item['box'][3]) / 2
                                     last_cy = (last_item['box'][1] + last_item['box'][3]) / 2
                                     
-                                    # Check vertical alignment (centers within 50 pixels) and horizontal distance (within 200 pixels)
                                     if abs(item_cy - last_cy) < 50 and (item['box'][0] - last_item['box'][2]) < 200:
                                         group.append(item)
                                         added = True
@@ -433,30 +429,18 @@ def generate_frames():
                                     groups.append([item])
                                     
                             for group in groups:
-                                # Sort items left to right
                                 group.sort(key=lambda x: x['box'][0])
-                                # Join text blocks
                                 combined_text = "".join([item['text'] for item in group])
                                 
-                                # Advanced Plate Cleanup based on positional Philippine plate formats
                                 import re
                                 clean_text = re.sub(r'[^A-Za-z0-9]', '', combined_text).upper()
-                                
-                                # Let's see if the cleaned string broadly matches Philippine format (3/4 letters, 3/4 numbers)
-                                # First we'll extract letters and numbers
                                 letters = re.sub(r'[^A-Z]', '', clean_text)
                                 numbers = re.sub(r'[^0-9]', '', clean_text)
                                 
-                                # A very basic heuristic: Plate needs roughly at least 5 alphanumeric characters total
                                 if len(letters) + len(numbers) >= 5:
-                                    
-                                    # Use the raw sequence as-is, so we don't accidentally reverse 123 ABC to ABC 123
                                     display_text = clean_text
-                                    
-                                    # Only log and draw if it's strictly matching this vehicle parameter size
                                     log_plate_detection(display_text, frame)
                                     
-                                    # Highlight the plate text with a prominent Green box over the entire grouped bounding box
                                     min_x = min([item['box'][0] for item in group])
                                     min_y = min([item['box'][1] for item in group])
                                     max_x = max([item['box'][2] for item in group])
@@ -465,7 +449,7 @@ def generate_frames():
                                     current_detections.append({
                                         "box": (min_x, min_y, max_x, max_y),
                                         "label": "", 
-                                        "color": (0, 255, 0), # Green for valid plate
+                                        "color": (0, 255, 0),
                                         "plate": f"{display_text}" 
                                     })
                                 
@@ -479,33 +463,46 @@ def generate_frames():
             # Draw detections on the frame
             for det in last_detections:
                 x1, y1, x2, y2 = det["box"]
-                color = det.get("color", (0, 255, 0)) # Default to green
-                
-                # Draw bounding box
+                color = det.get("color", (0, 255, 0))
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                
-                # Draw label (for YOLO)
                 if det["label"]:
                     cv2.putText(frame, det["label"], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                    
-                # Draw plate text (for OCR)
                 if det.get("plate"):
                      cv2.putText(frame, det["plate"], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 3)
 
-            # Encode frame to JPEG
+            # Encode frame to JPEG and save to global buffer
             ret, buffer = cv2.imencode('.jpg', frame)
-            frame_bytes = buffer.tobytes()
+            latest_frame_bytes = buffer.tobytes()
             
-            # Yield frame in MJPEG format
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            # Slight sleep to unblock CPU
+            time.sleep(0.01)
+            
         except Exception as e:
             print(f"Stream error: {e}")
-            break
+            time.sleep(1)
+
+# Start background camera loop immediately
+camera_thread = threading.Thread(target=camera_background_task, daemon=True)
+camera_thread.start()
+
+def stream_mjpeg():
+    while True:
+        if latest_frame_bytes:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + latest_frame_bytes + b'\r\n')
+        time.sleep(0.05)
+
+from fastapi import Response
 
 @router.get("/live-feed")
 async def live_feed():
-    return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(stream_mjpeg(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+@router.get("/snapshot")
+async def snapshot():
+    if latest_frame_bytes is None:
+        return Response(content=b"", media_type="image/jpeg")
+    return Response(content=latest_frame_bytes, media_type="image/jpeg")
 
 @router.get("/latest-scan")
 async def get_latest_scan():

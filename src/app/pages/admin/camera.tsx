@@ -94,9 +94,10 @@ const CameraPage = () => {
     const lastRfidScanIdRef = useRef<string | null>(null);
     const [rfidStatus, setRfidStatus] = useState<{connected: boolean, polling: boolean}>({connected: false, polling: false});
     const [isStreaming, setIsStreaming] = useState(false);
+    const [streamFrame, setStreamFrame] = useState<string | null>(null);
     const scanningRef = useRef(false);
 
-    const SCAN_INTERVAL_MS = 1000; // Tick every 1 second to check if a capture is needed
+    const SCAN_INTERVAL_MS = 1000;
     // MIN_CAPTURE_GAP_MS is dynamically decided in the loop now based on last result
     const ROI = {
         left: 0.2,
@@ -117,10 +118,33 @@ const CameraPage = () => {
     useEffect(() => {
         let scanInterval: NodeJS.Timeout;
         let clearTimer: NodeJS.Timeout;
+        let streamInterval: NodeJS.Timeout;
         let isMounted = true;
 
         if (selectedCamera === 1) {
-            setIsStreaming(true); // Assuming the img tag will load the MJPEG stream
+            setIsStreaming(true);
+
+            // Fetch video frames manually to bypass Ngrok constraints
+            streamInterval = setInterval(async () => {
+                if (!isMounted) return;
+                try {
+                    const res = await fetch(`${API_BASE_URL}/snapshot`, {
+                        headers: { 'ngrok-skip-browser-warning': 'true' }
+                    });
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        if (blob.size > 0) {
+                            const objectUrl = URL.createObjectURL(blob);
+                            setStreamFrame(prev => {
+                                if (prev) URL.revokeObjectURL(prev);
+                                return objectUrl;
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error("Frame fetch error:", err);
+                }
+            }, 100); // 10 FPS
 
             if (isAutoScanning) {
                 // Poll the backend's /latest-scan endpoint every second
@@ -130,7 +154,9 @@ const CameraPage = () => {
                     setScanStatus('scanning');
 
                     try {
-                        const response = await fetch(`${API_BASE_URL}/latest-scan`);
+                        const response = await fetch(`${API_BASE_URL}/latest-scan`, {
+                            headers: { 'ngrok-skip-browser-warning': 'true' }
+                        });
                         if (!response.ok) return;
 
                         const data = await response.json();
@@ -183,11 +209,13 @@ const CameraPage = () => {
             }
         } else {
             setIsStreaming(false);
+            setStreamFrame(null);
         }
 
         return () => {
             isMounted = false;
             if (scanInterval) clearInterval(scanInterval);
+            if (streamInterval) clearInterval(streamInterval);
             if (clearTimer) clearTimeout(clearTimer);
         };
     }, [selectedCamera, isAutoScanning]);
@@ -274,16 +302,19 @@ const CameraPage = () => {
                         <div className="relative aspect-video bg-black">
                             {selectedCamera === 1 ? (
                                 <>
-                                    <img
-                                        ref={imgRef}
-                                        src={`${API_BASE_URL}/live-feed`}
-                                        alt="Raspberry Pi Camera Feed"
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            console.error("Failed to load camera feed");
-                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 800 600"><rect width="100%" height="100%" fill="%230f172a"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%2364748b">Camera feed offline or loading...</text></svg>';
-                                        }}
-                                    />
+                                    {streamFrame ? (
+                                        <img
+                                            ref={imgRef}
+                                            src={streamFrame}
+                                            alt="Raspberry Pi Camera Feed"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 border border-slate-800">
+                                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500/20 border-t-emerald-500 mb-4" />
+                                            <p className="text-slate-500 text-sm animate-pulse">Connecting to hardware feed...</p>
+                                        </div>
+                                    )}
                                     {/* Capture Flash Effect */}
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
                                     
