@@ -426,8 +426,8 @@ def camera_background_task():
                         roi = frame[y1_roi:y2_roi, x1_roi:x2_roi]
 
                         if not ocr_queue.full():
-                            # Pass a copy of the ROI to avoid memory corruption across threads
-                            ocr_queue.put(roi.copy())
+                            # Pass a copy of the full frame and ROI to avoid memory corruption across threads
+                            ocr_queue.put((frame.copy(), roi.copy()))
 
 
                         candidates = []
@@ -474,7 +474,7 @@ def _ocr_background_worker():
     while ocr_worker_active:
         try:
             # Wait for an ROI image to appear in the queue
-            roi = ocr_queue.get(timeout=1)
+            frame, roi = ocr_queue.get(timeout=1)
             
             # Upscale 3x for clarity
             roi_up = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
@@ -522,7 +522,7 @@ def _ocr_background_worker():
             if best_plate:
                 print(f"[OCR] ✅ Plate detected asynchronously: {best_plate}")
                 # We log it. We use the most recent frame visually available.
-                log_plate_detection(best_plate, None) 
+                log_plate_detection(best_plate, frame) 
         except queue.Empty:
             continue
         except Exception as e:
