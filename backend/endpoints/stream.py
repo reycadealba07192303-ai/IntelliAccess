@@ -101,9 +101,17 @@ def log_plate_detection(plate_text: str, frame=None):
     if len(plate_text.replace(" ", "")) < 2:
         return
         
-    current_time = time.time()
-    
-    # Cooldown logic: if it's the same plate, wait 5 seconds before logging again
+    # Update frontend polling object REGARDLESS of cooldown
+    # This provides the "Live Green Box" indicator
+    latest_scan_result = {
+        "id": f"live_{int(current_time*10)}", 
+        "timestamp": current_time,
+        "plate_number": plate_text,
+        "detected": True,
+        "plate_box": { "x": 0.1, "y": 0.1, "w": 0.8, "h": 0.8 } # Simulated box centered in ROI
+    }
+
+    # Cooldown logic for DATABASE logging only
     if plate_text == last_logged_plate and (current_time - last_logged_time) < LOG_COOLDOWN_SECONDS:
         return
         

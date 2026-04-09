@@ -165,21 +165,15 @@ const CameraPage = () => {
                         const data = await response.json();
                         
                         if (data.detected) {
-                            if (data.id !== lastScanIdRef.current) {
+                            setScanStatus('found');
+                            setDetectionResult(data);
+                            
+                            if (data.id !== lastScanIdRef.current && !data.id.startsWith('live_')) {
                                 lastScanIdRef.current = data.id;
                                 
-                                setScanStatus('found');
                                 setScanCount(c => c + 1);
-
-                                // Flash effect
                                 setIsCapturing(true);
-                                setTimeout(() => {
-                                    if (isMounted) setIsCapturing(false);
-                                }, 150);
-
-                                // Show Results Panel
-                                setIsProcessing(false);
-                                setDetectionResult(data);
+                                setTimeout(() => { if (isMounted) setIsCapturing(false); }, 150);
                                 
                                 if (data.access_granted) {
                                     toast.success(`Granted: ${data.plate_number}`);
@@ -187,7 +181,6 @@ const CameraPage = () => {
                                     toast.error(`Denied: ${data.plate_number}`);
                                 }
 
-                                // Panel stays for 5 seconds, then clears
                                 if (clearTimer) clearTimeout(clearTimer);
                                 clearTimer = setTimeout(() => {
                                     if (isMounted) {
@@ -195,13 +188,13 @@ const CameraPage = () => {
                                         setScanStatus('idle');
                                     }
                                 }, 5000);
-                            } else {
-                                // Already handled this plate, stay in idle/scanning visual state
-                                setScanStatus('idle');
                             }
                         } else {
-                            // No plate detected in the last backend cycle
                             setScanStatus('idle');
+                            // Only clear result if it's not a fresh log being displayed
+                            if (!lastScanIdRef.current || lastScanIdRef.current.startsWith('live_')) {
+                                setDetectionResult(null);
+                            }
                         }
                     } catch (err) {
                         console.error("Polling error:", err);
