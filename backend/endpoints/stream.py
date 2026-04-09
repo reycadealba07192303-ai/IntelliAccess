@@ -481,9 +481,9 @@ def camera_background_task():
             print(f"Stream error: {e}")
             time.sleep(1)
 
-# Start background camera loop immediately
-camera_thread = threading.Thread(target=camera_background_task, daemon=True)
-camera_thread.start()
+def start_camera_thread():
+    camera_thread = threading.Thread(target=camera_background_task, daemon=True)
+    camera_thread.start()
 
 def stream_mjpeg():
     while True:
