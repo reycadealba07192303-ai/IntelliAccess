@@ -164,41 +164,44 @@ const CameraPage = () => {
 
                         const data = await response.json();
                         
-                        if (data.detected && data.id !== lastScanIdRef.current) {
-                            lastScanIdRef.current = data.id;
-                            
-                            setScanStatus('found');
-                            setScanCount(c => c + 1);
+                        if (data.detected) {
+                            if (data.id !== lastScanIdRef.current) {
+                                lastScanIdRef.current = data.id;
+                                
+                                setScanStatus('found');
+                                setScanCount(c => c + 1);
 
-                            // Flash effect
-                            setIsCapturing(true);
-                            setTimeout(() => {
-                                if (isMounted) setIsCapturing(false);
-                            }, 150);
+                                // Flash effect
+                                setIsCapturing(true);
+                                setTimeout(() => {
+                                    if (isMounted) setIsCapturing(false);
+                                }, 150);
 
-                            // Show Results Panel
-                            setIsProcessing(false);
-                            setDetectionResult(data);
-                            
-                            if (data.access_granted) {
-                                toast.success(`Granted: ${data.plate_number}`);
-                            } else {
-                                toast.error(`Denied: ${data.plate_number}`);
-                            }
-
-                            // Panel stays for 5 seconds, then clears
-                            if (clearTimer) clearTimeout(clearTimer);
-                            clearTimer = setTimeout(() => {
-                                if (isMounted) {
-                                    setDetectionResult(null);
-                                    setScanStatus('idle');
+                                // Show Results Panel
+                                setIsProcessing(false);
+                                setDetectionResult(data);
+                                
+                                if (data.access_granted) {
+                                    toast.success(`Granted: ${data.plate_number}`);
+                                } else {
+                                    toast.error(`Denied: ${data.plate_number}`);
                                 }
-                            }, 5000);
+
+                                // Panel stays for 5 seconds, then clears
+                                if (clearTimer) clearTimeout(clearTimer);
+                                clearTimer = setTimeout(() => {
+                                    if (isMounted) {
+                                        setDetectionResult(null);
+                                        setScanStatus('idle');
+                                    }
+                                }, 5000);
+                            } else {
+                                // Already handled this plate, stay in idle/scanning visual state
+                                setScanStatus('idle');
+                            }
                         } else {
-                            setScanStatus(prev => prev === 'found' ? 'found' : 'empty');
-                            setTimeout(() => {
-                                if (isMounted) setScanStatus(prev => prev === 'empty' ? 'idle' : prev);
-                            }, 800);
+                            // No plate detected in the last backend cycle
+                            setScanStatus('idle');
                         }
                     } catch (err) {
                         console.error("Polling error:", err);
@@ -231,14 +234,18 @@ const CameraPage = () => {
         const checkRfid = async () => {
             try {
                 // 1. Check Reader Connection Status
-                const statusRes = await fetch(`${API_BASE_URL}/rfid/status`);
+                const statusRes = await fetch(`${API_BASE_URL}/rfid/status`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
                 if (statusRes.ok) {
                     const statusData = await statusRes.json();
                     if (isMounted) setRfidStatus(statusData);
                 }
 
                 // 2. Check for Latest Scan
-                const scanRes = await fetch(`${API_BASE_URL}/rfid/latest-scan`);
+                const scanRes = await fetch(`${API_BASE_URL}/rfid/latest-scan`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
                 if (scanRes.ok) {
                     const scanData = await scanRes.json();
                     

@@ -151,7 +151,7 @@ mongo --eval "db.adminCommand('ping')"
 ```bash
 cd ~/IntelliAccess/backend
 source venv/bin/activate
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 You should see:
@@ -372,7 +372,7 @@ ngrok config add-authtoken <YOUR_AUTHTOKEN>
 ### Step 3: Test the Tunnel
 Test if the tunnel successfully connects to port 8000 (where our Python backend runs). Replace the domain with the one you claimed in the dashboard:
 ```bash
-ngrok http --domain=your-static-domain.ngrok-free.app 8000
+ngrok http --url=your-static-domain.ngrok-free.app 8000
 ```
 *If you see "Session Status: online" in green, it means your backend is now live on the internet! Press `Ctrl+C` to close it for now.*
 
@@ -393,7 +393,7 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-ExecStart=/usr/bin/ngrok http --domain=your-static-domain.ngrok-free.app 8000
+ExecStart=/usr/bin/ngrok http --url=your-static-domain.ngrok-free.app 8000
 Restart=always
 RestartSec=10
 
