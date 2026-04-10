@@ -113,10 +113,18 @@ const CameraPage = () => {
     };
 
     const plateOverlay = detectionResult?.plate_box ? {
-        left: `${(ROI.left + detectionResult.plate_box.x * ROI.width) * 100}%`,
-        top: `${(ROI.top + detectionResult.plate_box.y * ROI.height) * 100}%`,
-        width: `${detectionResult.plate_box.w * ROI.width * 100}%`,
-        height: `${detectionResult.plate_box.h * ROI.height * 100}%`,
+        left: selectedCamera === 1 
+            ? `${(ROI.left + detectionResult.plate_box.x * ROI.width) * 100}%`
+            : `${detectionResult.plate_box.x * 100}%`,
+        top: selectedCamera === 1
+            ? `${(ROI.top + detectionResult.plate_box.y * ROI.height) * 100}%`
+            : `${detectionResult.plate_box.y * 100}%`,
+        width: selectedCamera === 1
+            ? `${detectionResult.plate_box.w * ROI.width * 100}%`
+            : `${detectionResult.plate_box.w * 100}%`,
+        height: selectedCamera === 1
+            ? `${detectionResult.plate_box.h * ROI.height * 100}%`
+            : `${detectionResult.plate_box.h * 100}%`,
         label: `${detectionResult.plate_number || 'PLATE'} (${(detectionResult.confidence || 0).toFixed(1)}%)`,
     } : null;
 
@@ -467,6 +475,19 @@ const CameraPage = () => {
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
                                     
                                     {/* Scanning Target Box with Live Status */}
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                        <div className="border-2 border-dashed border-white/20 rounded-xl" style={{
+                                            width: `${ROI.width * 100}%`,
+                                            height: `${ROI.height * 100}%`,
+                                            maxWidth: '80%',
+                                            maxHeight: '60%',
+                                            boxShadow: '0 0 0 1000px rgba(0,0,0,0.3)'
+                                        }}>
+                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                                                Align Plate Here
+                                            </div>
+                                        </div>
+                                    </div>
 
 
                                     {/* Live OCR boxes (from last detected plate) */}
@@ -493,7 +514,21 @@ const CameraPage = () => {
                                         muted
                                         className="w-full h-full object-cover"
                                     />
-                                    <canvas ref={canvasRef} className="hidden" />
+                                    {/* Scanning Target Box for Laptop */}
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                        <div className="border-2 border-dashed border-white/40 rounded-xl" style={{
+                                            width: '60%',
+                                            height: '40%',
+                                            boxShadow: '0 0 0 1000px rgba(0,0,0,0.4)'
+                                        }}>
+                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-2">
+                                                {scanStatus === 'scanning' ? (
+                                                    <><div className="h-2 w-2 animate-spin rounded-full border border-white/20 border-t-white" /> Analyzing...</>
+                                                ) : "Position Plate in Center"}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Capture Flash Effect */}
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
                                     

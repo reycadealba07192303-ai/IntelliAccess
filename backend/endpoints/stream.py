@@ -527,39 +527,38 @@ def _ocr_background_worker():
             roi_up = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
             gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
             
-            # Single pass Otsu Threshold (fastest reliable method)
-            _, thresh = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            # Better Tesseract Preprocessing
+            # Adaptive thresholding and denoising
+            denoised = cv2.bilateralFilter(gray_roi, 11, 17, 17)
+            thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                            cv2.THRESH_BINARY, 11, 2)
             
             candidates = []
-            cfg = '--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-            try:
-                raw = pytesseract.image_to_string(thresh, config=cfg)
-                cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
-                if cleaned and len(cleaned) >= 5:
-                    candidates.append(cleaned)
-            except Exception:
-                pass
-
-
             best_plate = None
-            for candidate in candidates:
-                for pattern in ph_patterns:
-                    if pattern.match(candidate):
-                        best_plate = candidate
-                        break
-                if best_plate:
-                    break
+            
+            # Try multiple PSM modes
+            for psm in [7, 8]:
+                cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                try:
+                    raw = pytesseract.image_to_string(thresh, config=cfg)
+                    cleaned = _re.sub(r'[^A-Z0-9]', '', raw.upper())
+                    
+                    if cleaned and 3 <= len(cleaned) <= 8:
+                        for pattern in ph_patterns:
+                            if pattern.match(cleaned):
+                                best_plate = cleaned
+                                break
+                        if not best_plate:
+                            m = _re.search(r'([A-Z]{2,3})(\d{3,4})|(\d{3,4})([A-Z]{2,3})', cleaned)
+                            if m:
+                                best_plate = cleaned
+                        
+                        if best_plate: break
+                except Exception:
+                    pass
 
-            if not best_plate:
-                for candidate in candidates:
-                    m = re.search(r'([A-Z]{2,3})(\d{3,4})', candidate)
-                    if m:
-                        best_plate = m.group(1) + m.group(2)
-                        break
-                    m = re.search(r'(\d{3,4})([A-Z]{2,3})', candidate)
-                    if m:
-                        best_plate = m.group(1) + m.group(2)
-                        break
+            if not best_plate and cleaned and 4 <= len(cleaned) <= 8:
+                best_plate = cleaned
 
             if best_plate:
                 print(f"[OCR] ✅ Instant Detection: {best_plate}")

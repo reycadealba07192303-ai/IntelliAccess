@@ -242,50 +242,54 @@ async def detect_vehicle(file: UploadFile = File(...)):
             elif OCR_AVAILABLE:
                 import pytesseract
                 # Tesseract fallback for Raspberry Pi
-                # Crop to center to avoid UI elements if any
+                # Crop to center to avoid UI elements and focus on the plate
                 h, w = img.shape[:2]
-                y1_roi, y2_roi = int(h * 0.15), int(h * 0.85)
-                x1_roi, x2_roi = int(w * 0.1), int(w * 0.9)
-                roi = img[y1_roi:y2_roi, x1_roi:x2_roi]
+                y1, y2 = int(h * 0.1), int(h * 0.9)
+                x1, x2 = int(w * 0.1), int(w * 0.9)
+                roi = img[y1:y2, x1:x2]
                 
+                # Preprocessing for Tesseract
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                # Use slightly larger image for Tesseract if it was compressed heavily
-                r_h, r_w = gray.shape
-                upscaled = cv2.resize(gray, (r_w * 2, r_h * 2), interpolation=cv2.INTER_CUBIC)
-                _, thresh = cv2.threshold(upscaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                cfg = '--psm 11 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                raw = pytesseract.image_to_string(thresh, config=cfg)
+                # Denoise
+                denoised = cv2.bilateralFilter(gray, 11, 17, 17)
+                # Adaptive thresholding for more robustness than Otsu
+                thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                                cv2.THRESH_BINARY, 11, 2)
                 
-                # Removing spaces first so we can parse everything without spaces
-                combined = re.sub(r'\s+', '', raw.upper())
-                cleaned = re.sub(r'[^A-Z0-9]', '', combined)
-                
-                ph_patterns = [
-                    re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
-                    re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
-                    re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
-                ]
-                
+                # Try PSM 7 (Single Line) and PSM 8 (Single Word)
                 best_plate = None
-                if cleaned and len(cleaned) >= 4:
-                    for pattern in ph_patterns:
-                        if pattern.match(cleaned):
-                            best_plate = cleaned
-                            break
-                    if not best_plate:
-                        m = re.search(r'([A-Z]{2,3})(\d{3,4})', cleaned)
-                        if m:
-                            best_plate = m.group(1) + m.group(2)
-                        else:
-                            m = re.search(r'(\d{3,4})([A-Z]{2,3})', cleaned)
-                            if m:
-                                best_plate = m.group(1) + m.group(2)
-                                
+                for psm in [7, 8]:
+                    cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                    raw = pytesseract.image_to_string(thresh, config=cfg)
+                    
+                    # Clean the result
+                    combined = re.sub(r'\s+', '', raw.upper())
+                    cleaned = re.sub(r'[^A-Z0-9]', '', combined)
+                    
+                    if cleaned and 3 <= len(cleaned) <= 8:
+                        for pattern in ph_patterns:
+                            if pattern.match(cleaned):
+                                best_plate = cleaned
+                                break
+                        if not best_plate:
+                             # Looser match for partials
+                             m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
+                             if m:
+                                 best_plate = m.group(0)
+                        
+                        if best_plate: break
+                
+                if not best_plate and cleaned and 4 <= len(cleaned) <= 8:
+                    best_plate = cleaned
+
                 if best_plate:
                     plate_text = best_plate
                     detected = True
                     confidence = 85.0
-                    plate_box = {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.4}
+                    # For Tesseract fallback, return a centered box relative to ROI
+                    # Since we cropped 10% on each side, ROI is [0.1, 0.1, 0.8, 0.8]
+                    # We return a dummy box within that ROI
+                    plate_box = {"x": 0.25, "y": 0.35, "w": 0.5, "h": 0.3}
                     print(f"[DETECT] Tesseract found plate: {plate_text}")
                     cv2.putText(img, f"{plate_text}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
                     
