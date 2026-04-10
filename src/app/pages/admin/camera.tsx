@@ -90,6 +90,11 @@ const CameraPage = () => {
     const currentCamera = cameras.find(c => c.id === selectedCamera) || cameras[0] || {};
 
     const imgRef = useRef<HTMLImageElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const lastScanIdRef = useRef<string | null>(null);
     const lastRfidScanIdRef = useRef<string | null>(null);
     const [rfidStatus, setRfidStatus] = useState<{connected: boolean, polling: boolean}>({connected: false, polling: false});
@@ -219,6 +224,146 @@ const CameraPage = () => {
         };
     }, [selectedCamera, isAutoScanning]);
 
+    // --- Local Webcam Polling (Laptop) ---
+    useEffect(() => {
+        let captureInterval: NodeJS.Timeout;
+        let isMounted = true;
+        
+        let activeStream: MediaStream | null = null;
+        
+        const setupWebcam = async () => {
+            if (currentCamera.url !== "local_webcam") return;
+            
+            // First time getting permissions and listing devices
+            try {
+                if (videoDevices.length === 0) {
+                    await navigator.mediaDevices.getUserMedia({ video: true }); // Request initial permission
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const vDevices = devices.filter(d => d.kind === 'videoinput');
+                    if (isMounted) {
+                        setVideoDevices(vDevices);
+                        if (!selectedDeviceId && vDevices.length > 0) {
+                            setSelectedDeviceId(vDevices[0].deviceId);
+                        }
+                    }
+                }
+
+                // Wait until we have a device ID selected
+                const targetDeviceId = selectedDeviceId || (videoDevices[0]?.deviceId);
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: targetDeviceId ? { deviceId: { exact: targetDeviceId } } : true
+                });
+                
+                activeStream = stream; // Keep track for cleanup
+                
+                if (!isMounted) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+                setLocalStream(stream);
+            } catch (err) {
+                if (isMounted) {
+                    console.error("Camera access error:", err);
+                    toast.error("Failed to access laptop webcam. Defaulting fallback...");
+                }
+            }
+        };
+
+        setupWebcam();
+
+        if (currentCamera.url === "local_webcam" && isAutoScanning) {
+            captureInterval = setInterval(async () => {
+                if (scanningRef.current || !videoRef.current || !canvasRef.current) return;
+                
+                const video = videoRef.current;
+                const canvas = canvasRef.current;
+                
+                // Compress to 640x480 to prevent crashing the Raspberry Pi backend
+                // The Pi has limited RAM and running AI on HD images causes Out of Memory
+                canvas.width = 640;
+                canvas.height = 480;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                
+                // Draw current video frame to hidden canvas, downscaling it to 640x480
+                ctx.drawImage(video, 0, 0, 640, 480);
+                
+                scanningRef.current = true;
+                setScanStatus('scanning');
+                
+                canvas.toBlob(async (blob) => {
+                    if (!blob) {
+                        scanningRef.current = false;
+                        return;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append("file", blob, "webcam.jpg");
+                    
+                    try {
+                        const res = await apiFetch("/detect", {
+                            method: "POST",
+                            body: formData
+                        });
+                        
+                        if (isMounted && res.detected) {
+                            setScanStatus('found');
+                            setDetectionResult(res);
+                            
+                            // Prevent duplicate toast if it's the same plate within 5 secs
+                            const resultId = res.plate_number + (res.timestamp || Date.now());
+                            if (resultId !== lastScanIdRef.current) {
+                                lastScanIdRef.current = resultId;
+                                setScanCount(c => c+1);
+                                setIsCapturing(true);
+                                setTimeout(() => { if (isMounted) setIsCapturing(false); }, 150);
+                                
+                                if (res.access_granted) {
+                                    toast.success(`Granted (Webcam): ${res.plate_number}`);
+                                } else {
+                                    toast.error(`Denied (Webcam): ${res.plate_number}`);
+                                }
+                                
+                                setTimeout(() => {
+                                    if (isMounted) {
+                                        setDetectionResult(null);
+                                        setScanStatus('idle');
+                                    }
+                                }, 5000);
+                            }
+                        } else if (isMounted) {
+                            // If no plate, gracefully clear out old plate if it expired
+                            setScanStatus('idle');
+                            setDetectionResult(null);
+                        }
+                    } catch (err) {
+                        console.error("Local webcam detect error:", err);
+                        if (isMounted) setScanStatus('idle');
+                    } finally {
+                        if (isMounted) scanningRef.current = false;
+                    }
+                }, "image/jpeg", 0.6);
+            }, 1500); // Capture and post a frame every 1.5 seconds
+        }
+
+        return () => {
+            isMounted = false;
+            if (captureInterval) clearInterval(captureInterval);
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [currentCamera.url, isAutoScanning, selectedDeviceId]); // Re-attach when device changes
+
+    // Attach stream to video tag whenever either changes
+    useEffect(() => {
+        if (currentCamera.url === "local_webcam" && videoRef.current && localStream) {
+            videoRef.current.srcObject = localStream;
+            videoRef.current.play().catch(e => console.error("Play error:", e));
+        }
+    }, [currentCamera.url, localStream]);
+
     // --- RFID Hardware Polling ---
     useEffect(() => {
         let statusInterval: NodeJS.Timeout;
@@ -339,18 +484,59 @@ const CameraPage = () => {
                                         </div>
                                     )}
                                 </>
+                            ) : currentCamera.url === "local_webcam" ? (
+                                <>
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <canvas ref={canvasRef} className="hidden" />
+                                    {/* Capture Flash Effect */}
+                                    <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
+                                    
+                                    {/* Device Selector Overlay */}
+                                    {videoDevices.length > 1 && (
+                                        <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-1">
+                                            <span className="text-[10px] uppercase font-bold text-slate-300 drop-shadow-md bg-black/40 px-2 py-0.5 rounded">Switch Camera Device</span>
+                                            <select
+                                                className="bg-black/80 text-white text-xs px-3 py-2 rounded-lg border border-white/20 backdrop-blur-md outline-none cursor-pointer hover:bg-slate-800 transition-colors shadow-lg"
+                                                value={selectedDeviceId}
+                                                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                                            >
+                                                {videoDevices.map(device => (
+                                                    <option key={device.deviceId} value={device.deviceId}>
+                                                        {device.label || `Camera ${videoDevices.indexOf(device) + 1}`}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Live OCR overlay */}
+                                    {plateOverlay && (
+                                        <div className="absolute border-2 border-lime-400/80 rounded-md pointer-events-none" style={{
+                                            left: plateOverlay.left,
+                                            top: plateOverlay.top,
+                                            width: plateOverlay.width,
+                                            height: plateOverlay.height,
+                                            boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.5)',
+                                        }}>
+                                            <div className="absolute -top-6 left-0 bg-lime-500/90 text-black text-xs px-2 py-0.5 rounded-sm">
+                                                {plateOverlay.label}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="relative w-full h-full">
                                     <img
                                         src={currentCamera.url}
                                         alt={currentCamera.name}
-                                        className={`w-full h-full object-cover transition-opacity duration-300 ${selectedCamera === 1 ? "opacity-30 grayscale" : "opacity-80"}`}
+                                        className="w-full h-full object-cover transition-opacity duration-300 opacity-80"
                                     />
-                                    {selectedCamera !== 1 && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            {/* Placeholder overlay for other cameras */}
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
@@ -358,7 +544,9 @@ const CameraPage = () => {
                             <div className="absolute top-4 left-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md">
                                 <div className="h-2 w-2 animate-pulse rounded-full bg-red-500"></div>
                                 <span className="text-xs font-medium text-white">
-                                    {selectedCamera === 1 ? "Local Device Camera" : cameras.find(c => c.id === selectedCamera)?.name}
+                                    {selectedCamera === 1 ? "Local Device Camera" : 
+                                     currentCamera.url === "local_webcam" ? (videoDevices.find(d => d.deviceId === selectedDeviceId)?.label || "Laptop Webcam") : 
+                                     currentCamera.name}
                                 </span>
                             </div>
 
@@ -621,6 +809,7 @@ const CameraPage = () => {
                                         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-slate-500 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50 appearance-none"
                                     >
                                         <option value={`${API_BASE_URL}/live-feed`} className="bg-slate-800 text-white">Built-in Camera (Live Stream)</option>
+                                        <option value="local_webcam" className="bg-slate-800 text-emerald-400 font-bold">Laptop Webcam (Local Browser)</option>
                                         <option value="https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=800&auto=format&fit=crop" className="bg-slate-800 text-white">Demo Module 1 (Parking Lot)</option>
                                         <option value="https://images.unsplash.com/photo-1563630423918-b58f07336ac9?q=80&w=800&auto=format&fit=crop" className="bg-slate-800 text-white">Demo Module 2 (Main Gate)</option>
                                     </select>

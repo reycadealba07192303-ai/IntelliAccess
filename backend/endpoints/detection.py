@@ -5,23 +5,44 @@ from datetime import datetime
 
 router = APIRouter()
 
+import platform
+_is_arm = platform.machine().startswith('arm') or platform.machine().startswith('aarch')
+
 # Try to import AI libraries, handle failure gracefully
 try:
     import numpy as np
     import cv2
-    import easyocr
-    from ultralytics import YOLO
     
-    # Initialize EasyOCR Reader (loads into memory once)
-    reader = easyocr.Reader(['en'], gpu=False)
-    
-    # Load YOLO model
-    model = YOLO("yolov8n.pt") 
-    
-    AI_AVAILABLE = True
+    if _is_arm:
+        print("[DETECT] ARM CPU detected. Disabling PyTorch (YOLO/EasyOCR) to prevent Illegal instruction crashes.")
+        AI_AVAILABLE = False
+        reader = None
+        model = None
+        
+        # Load Tesseract fallback
+        try:
+            import pytesseract
+            OCR_AVAILABLE = True
+            print("[DETECT] Tesseract OCR fallback activated.")
+        except ImportError:
+            OCR_AVAILABLE = False
+            print("[DETECT] Tesseract not installed.")
+    else:
+        import easyocr
+        from ultralytics import YOLO
+        
+        # Initialize EasyOCR Reader (loads into memory once)
+        reader = easyocr.Reader(['en'], gpu=False)
+        
+        # Load YOLO model
+        model = YOLO("yolov8n.pt") 
+        
+        AI_AVAILABLE = True
+        OCR_AVAILABLE = False
 except Exception as e:
     print(f"AI Libraries failed to load: {e}. AI features disabled.")
     AI_AVAILABLE = False
+    OCR_AVAILABLE = False
     reader = None
     model = None
 
@@ -48,9 +69,6 @@ async def detect_vehicle(file: UploadFile = File(...)):
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Run YOLO inference
-        results = model(img)
-        
         detected = False
         vehicle_type = "Unknown"
         confidence = 0.0
@@ -58,27 +76,31 @@ async def detect_vehicle(file: UploadFile = File(...)):
         plate_box = None
         best_box = None
 
-        # YOLOv8 COCO Classes: 2=car, 3=motorcycle, 5=bus, 7=truck
-        vehicle_classes = [2, 3, 5, 7]
-        
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                cls = int(box.cls[0])
-                conf = float(box.conf[0])
-                
-                if cls in vehicle_classes and conf > 0.4:
-                    detected = True
-                    confidence = conf
-                    vehicle_type = model.names[cls]
+        if model:
+            # Run YOLO inference
+            results = model(img)
+
+            # YOLOv8 COCO Classes: 2=car, 3=motorcycle, 5=bus, 7=truck
+            vehicle_classes = [2, 3, 5, 7]
+            
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
+                    cls = int(box.cls[0])
+                    conf = float(box.conf[0])
                     
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    # Draw YOLO box
-                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                    cv2.putText(img, f"{vehicle_type} ({conf:.2f})", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                    if cls in vehicle_classes and conf > 0.4:
+                        detected = True
+                        confidence = conf
+                        vehicle_type = model.names[cls]
+                        
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        # Draw YOLO box
+                        cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                        cv2.putText(img, f"{vehicle_type} ({conf:.2f})", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                        break
+                if detected:
                     break
-            if detected:
-                break
 
         # --- OCR Logic with Enhanced Preprocessing ---
         import re
@@ -193,6 +215,47 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     }
                     
                     print(f"[AI] Plate detected: {plate_text} | Confidence: {confidence}% | Box: {plate_box}")
+            
+            elif OCR_AVAILABLE:
+                import pytesseract
+                # Tesseract fallback for Raspberry Pi
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                # Use slightly larger image for Tesseract if it was compressed heavily
+                h, w = gray.shape
+                upscaled = cv2.resize(gray, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
+                _, thresh = cv2.threshold(upscaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                cfg = '--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                raw = pytesseract.image_to_string(thresh, config=cfg)
+                cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                
+                ph_patterns = [
+                    re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
+                    re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
+                    re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
+                ]
+                
+                best_plate = None
+                if cleaned and len(cleaned) >= 4:
+                    for pattern in ph_patterns:
+                        if pattern.match(cleaned):
+                            best_plate = cleaned
+                            break
+                    if not best_plate:
+                        m = re.search(r'([A-Z]{2,3})(\d{3,4})', cleaned)
+                        if m:
+                            best_plate = m.group(1) + m.group(2)
+                        else:
+                            m = re.search(r'(\d{3,4})([A-Z]{2,3})', cleaned)
+                            if m:
+                                best_plate = m.group(1) + m.group(2)
+                                
+                if best_plate:
+                    plate_text = best_plate
+                    detected = True
+                    confidence = 85.0
+                    plate_box = {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.4}
+                    print(f"[DETECT] Tesseract found plate: {plate_text}")
+                    cv2.putText(img, f"{plate_text}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
                     
         except Exception as ocr_e:
             print(f"OCR Error: {ocr_e}")
