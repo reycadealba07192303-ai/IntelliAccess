@@ -287,15 +287,18 @@ const CameraPage = () => {
                 const video = videoRef.current;
                 const canvas = canvasRef.current;
                 
-                // Compress to 640x480 to prevent crashing the Raspberry Pi backend
-                // The Pi has limited RAM and running AI on HD images causes Out of Memory
-                canvas.width = 640;
-                canvas.height = 480;
+                // Maintain aspect ratio while resizing to prevent OCR distortion
+                const videoWidth = video.videoWidth;
+                const videoHeight = video.videoHeight;
+                const targetWidth = 640;
+                const targetHeight = (videoHeight / videoWidth) * targetWidth;
+                
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
                 
-                // Draw current video frame to hidden canvas, downscaling it to 640x480
-                ctx.drawImage(video, 0, 0, 640, 480);
+                ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
                 
                 scanningRef.current = true;
                 setScanStatus('scanning');
@@ -345,9 +348,15 @@ const CameraPage = () => {
                             setScanStatus('idle');
                             setDetectionResult(null);
                         }
-                    } catch (err) {
+                    } catch (err: any) {
                         console.error("Local webcam detect error:", err);
-                        if (isMounted) setScanStatus('idle');
+                        if (isMounted) {
+                            setScanStatus('idle');
+                            // Specifically alert if it's a connection error
+                            if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+                                toast.error("Cannot reach Raspberry Pi. Check Ngrok URL!", { id: 'api-error' });
+                            }
+                        }
                     } finally {
                         if (isMounted) scanningRef.current = false;
                     }
@@ -474,17 +483,29 @@ const CameraPage = () => {
                                     {/* Capture Flash Effect */}
                                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${isCapturing ? "opacity-30" : "opacity-0"}`} />
                                     
-                                    {/* Scanning Target Box with Live Status */}
+                                    {/* Step 3: ROI Box Overlay */}
                                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                        <div className="border-2 border-dashed border-white/20 rounded-xl" style={{
-                                            width: `${ROI.width * 100}%`,
-                                            height: `${ROI.height * 100}%`,
-                                            maxWidth: '80%',
-                                            maxHeight: '60%',
-                                            boxShadow: '0 0 0 1000px rgba(0,0,0,0.3)'
-                                        }}>
-                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                                                Align Plate Here
+                                        <div className={`border-2 rounded-xl transition-all duration-300 ${scanStatus === 'scanning' ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-dashed border-white/20'}`} 
+                                            style={{
+                                                width: `${ROI.width * 100}%`,
+                                                height: `${ROI.height * 100}%`,
+                                                maxWidth: '80%',
+                                                maxHeight: '60%',
+                                                boxShadow: scanStatus === 'scanning' ? '0 0 0 1000px rgba(0,0,0,0.5)' : '0 0 0 1000px rgba(0,0,0,0.3)'
+                                            }}>
+                                            
+                                            {/* Step 2-5 Status Indicator */}
+                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+                                                {scanStatus === 'scanning' ? (
+                                                    <div className="flex items-center gap-2 bg-emerald-500 text-black font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-tight shadow-lg">
+                                                        <div className="h-1.5 w-1.5 bg-black rounded-full animate-ping" />
+                                                        AI Reading Plate
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-white/30 font-bold text-[8px] uppercase tracking-widest">
+                                                        [ ROI SCAN AREA ]
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -521,10 +542,29 @@ const CameraPage = () => {
                                             height: '40%',
                                             boxShadow: '0 0 0 1000px rgba(0,0,0,0.4)'
                                         }}>
-                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-2">
+                                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
                                                 {scanStatus === 'scanning' ? (
-                                                    <><div className="h-2 w-2 animate-spin rounded-full border border-white/20 border-t-white" /> Analyzing...</>
-                                                ) : "Position Plate in Center"}
+                                                    <motion.div 
+                                                        initial={{ scale: 0.8, opacity: 0 }}
+                                                        animate={{ scale: 1, opacity: 1 }}
+                                                        className="flex items-center gap-3 bg-emerald-500 text-black font-black text-[10px] px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] uppercase tracking-tighter"
+                                                    >
+                                                        <div className="h-2 w-2 bg-black rounded-full animate-pulse" />
+                                                        Step 5: OCR Reading...
+                                                    </motion.div>
+                                                ) : scanStatus === 'found' ? (
+                                                    <motion.div 
+                                                        initial={{ y: 5, opacity: 0 }}
+                                                        animate={{ y: 0, opacity: 1 }}
+                                                        className="bg-blue-500 text-white font-black text-[10px] px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)] uppercase tracking-tighter"
+                                                    >
+                                                        Step 7-10: Plate Verified!
+                                                    </motion.div>
+                                                ) : (
+                                                    <div className="text-white/40 font-bold text-[9px] uppercase tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm border border-white/5">
+                                                        Step 2: Monitoring Motion...
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

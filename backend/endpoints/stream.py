@@ -518,30 +518,55 @@ def _ocr_background_worker():
     ]
     
     # Instant Speed Mode: No consensus buffer needed. Log on first valid detection.
+    prev_gray = None
+    motion_threshold = 500 # Adjust sensitivity here
     
     while ocr_worker_active:
         try:
             # Wait for an ROI image to appear in the queue
             frame, roi = ocr_queue.get(timeout=1)
-                        # Upscale 2x for speed vs accuracy balance on Pi
+            
+            # Step 1: Small resize for motion detection (speed up)
+            roi_small = cv2.resize(roi, (100, 100))
+            gray_small = cv2.cvtColor(roi_small, cv2.COLOR_BGR2GRAY)
+            gray_small = cv2.GaussianBlur(gray_small, (21, 21), 0)
+            
+            if prev_gray is None:
+                prev_gray = gray_small
+                continue
+                
+            # Step 2: Motion Detection (Step 2 in user workflow)
+            frame_delta = cv2.absdiff(prev_gray, gray_small)
+            thresh_delta = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+            movement = cv2.countNonZero(thresh_delta)
+            
+            prev_gray = gray_small
+            
+            if movement < motion_threshold:
+                # No significant motion, skip expensive OCR
+                continue
+                
+            print(f"[MOTION] Detected movement ({movement}), running OCR...")
+
+            # Step 4: Preprocess Image (Improved)
+            # Upscale 2x for speed vs accuracy balance on Pi
             roi_up = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
             gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
             
-            # Better Tesseract Preprocessing
-            # Adaptive thresholding and denoising
+            # Denoise and sharpen
             denoised = cv2.bilateralFilter(gray_roi, 11, 17, 17)
+            
+            # Step 5: OCR (Read Plate)
+            # Adaptive thresholding and multiple PSM check
             thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                             cv2.THRESH_BINARY, 11, 2)
             
-            candidates = []
             best_plate = None
-            
-            # Try multiple PSM modes
             for psm in [7, 8]:
                 cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
                 try:
                     raw = pytesseract.image_to_string(thresh, config=cfg)
-                    cleaned = _re.sub(r'[^A-Z0-9]', '', raw.upper())
+                    cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
                     
                     if cleaned and 3 <= len(cleaned) <= 8:
                         for pattern in ph_patterns:
@@ -549,19 +574,17 @@ def _ocr_background_worker():
                                 best_plate = cleaned
                                 break
                         if not best_plate:
-                            m = _re.search(r'([A-Z]{2,3})(\d{3,4})|(\d{3,4})([A-Z]{2,3})', cleaned)
-                            if m:
-                                best_plate = cleaned
+                             m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
+                             if m: best_plate = m.group(0)
                         
                         if best_plate: break
-                except Exception:
-                    pass
+                except Exception: pass
 
             if not best_plate and cleaned and 4 <= len(cleaned) <= 8:
                 best_plate = cleaned
 
             if best_plate:
-                print(f"[OCR] ✅ Instant Detection: {best_plate}")
+                print(f"[OCR] ✅ Step 5-10 Success: {best_plate}")
                 log_plate_detection(best_plate, frame) 
         except queue.Empty:
             continue

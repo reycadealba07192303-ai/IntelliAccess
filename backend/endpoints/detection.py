@@ -53,6 +53,7 @@ COOLDOWN_SECONDS = 60  # Ignore same plate for 60 seconds after first detection
 
 @router.post("/detect")
 async def detect_vehicle(file: UploadFile = File(...)):
+    print(f"[DETECT] Received request from client... ({datetime.now().strftime('%H:%M:%S')})")
     if not AI_AVAILABLE:
          return {
             "status": "warning", 
@@ -248,21 +249,21 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 x1, x2 = int(w * 0.1), int(w * 0.9)
                 roi = img[y1:y2, x1:x2]
                 
-                # Preprocessing for Tesseract
+                # Step 4: Preprocess Image (Enhanced)
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                 # Denoise
                 denoised = cv2.bilateralFilter(gray, 11, 17, 17)
-                # Adaptive thresholding for more robustness than Otsu
+                # Adaptive thresholding 
                 thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                                 cv2.THRESH_BINARY, 11, 2)
                 
-                # Try PSM 7 (Single Line) and PSM 8 (Single Word)
+                # Step 5: OCR (Read Plate)
                 best_plate = None
                 for psm in [7, 8]:
                     cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
                     raw = pytesseract.image_to_string(thresh, config=cfg)
                     
-                    # Clean the result
+                    # Step 6: Clean text
                     combined = re.sub(r'\s+', '', raw.upper())
                     cleaned = re.sub(r'[^A-Z0-9]', '', combined)
                     
@@ -272,10 +273,8 @@ async def detect_vehicle(file: UploadFile = File(...)):
                                 best_plate = cleaned
                                 break
                         if not best_plate:
-                             # Looser match for partials
                              m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
-                             if m:
-                                 best_plate = m.group(0)
+                             if m: best_plate = m.group(0)
                         
                         if best_plate: break
                 
