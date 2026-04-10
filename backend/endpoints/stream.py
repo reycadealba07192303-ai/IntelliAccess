@@ -324,6 +324,7 @@ def log_plate_detection(plate_text: str, frame=None):
     except Exception as e:
          print(f"Error logging plate detection: {e}")
 
+from pydantic import BaseModel
 from typing import Optional
 class RemoteResultRequest(BaseModel):
     plate_number: str
