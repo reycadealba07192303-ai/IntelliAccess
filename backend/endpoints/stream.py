@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 import threading
 import time
+import os
 from datetime import datetime
 
 # Optional imports for AI and Camera
