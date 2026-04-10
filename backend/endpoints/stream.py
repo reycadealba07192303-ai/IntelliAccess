@@ -339,33 +339,47 @@ def get_camera():
     if camera is not None and hasattr(camera, 'isOpened') and camera.isOpened():
         return camera
 
-    # On Raspberry Pi, /dev/video0-2 are ISP/metadata nodes, not real cameras.
-    # Use v4l2-ctl to find real capture-capable devices, then fall back to brute-force scan.
+    # On Raspberry Pi, /dev/video0-31 include ISP/codec nodes that are NOT cameras.
+    # Use v4l2-ctl to find ONLY real USB webcam device paths and open by path directly.
     import subprocess, re as _re
-    candidate_indices = []
+    
+    usb_cam_paths = []  # Prioritized USB webcam paths
+    other_paths = []     # Other device paths as fallback
+    
     try:
         result = subprocess.run(
             ['v4l2-ctl', '--list-devices'],
             capture_output=True, text=True, timeout=5
         )
-        # Extract all /dev/videoN lines and try those first
-        found = _re.findall(r'/dev/video(\d+)', result.stdout)
-        candidate_indices = [int(x) for x in found]
-        print(f"[CAMERA] v4l2-ctl found devices: {[f'/dev/video{i}' for i in candidate_indices]}")
-    except Exception:
-        pass
-    # Also add a wide brute-force fallback range in case v4l2-ctl is missing
-    for extra in range(0, 32):
-        if extra not in candidate_indices:
-            candidate_indices.append(extra)
+        # Parse v4l2-ctl output: device headers followed by indented /dev/videoN paths
+        current_header = ""
+        for line in result.stdout.split('\n'):
+            stripped = line.strip()
+            if stripped and not stripped.startswith('/dev/'):
+                current_header = stripped.lower()
+            elif stripped.startswith('/dev/video'):
+                # USB webcams have "usb" in the header. ISP/codec nodes have "bcm2835" or "platform"
+                if 'usb' in current_header:
+                    usb_cam_paths.append(stripped)
+                elif 'bcm2835' not in current_header and 'platform' not in current_header and 'rpi' not in current_header and 'unicam' not in current_header:
+                    other_paths.append(stripped)
+        
+        print(f"[CAMERA] USB webcam devices: {usb_cam_paths}")
+        if other_paths:
+            print(f"[CAMERA] Other devices: {other_paths}")
+    except Exception as e:
+        print(f"[CAMERA] v4l2-ctl not available ({e}), using fallback scan")
+    
+    # Build final list: USB webcams first, then others, then brute-force /dev/video0-5
+    all_paths = usb_cam_paths + other_paths
+    if not all_paths:
+        all_paths = [f"/dev/video{i}" for i in range(6)]
 
-    for device_index in candidate_indices:
+    for dev_path in all_paths:
         try:
-            print(f"Trying to open VideoCapture({device_index}) with V4L2 backend...")
-            # Try V4L2 first (Linux native), fallback to auto
-            cam = cv2.VideoCapture(device_index, cv2.CAP_V4L2)
-            if not cam.isOpened():
-                cam = cv2.VideoCapture(device_index)
+            print(f"[CAMERA] Trying to open {dev_path} ...")
+            # Open by PATH string — avoids the "index out of range" crash
+            cam = cv2.VideoCapture(dev_path, cv2.CAP_V4L2)
             
             if cam.isOpened():
                 # Force resolution to avoid driver negotiation hangs
@@ -375,7 +389,7 @@ def get_camera():
                 cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 
                 # Drain initial blank frames (common with USB cams)
-                print("Camera is opened! Draining initial frames...")
+                print(f"[CAMERA] {dev_path} opened! Draining initial frames...")
                 for _ in range(10):
                     cam.grab()
                     time.sleep(0.05)
@@ -383,16 +397,16 @@ def get_camera():
                 # Verify actual frame data
                 ret, test_frame = cam.read()
                 if ret and test_frame is not None:
-                    print(f"Camera warmup complete (device {device_index}, frame shape: {test_frame.shape})")
+                    print(f"[CAMERA] Warmup complete ({dev_path}, frame shape: {test_frame.shape})")
                     camera = cam
                     return camera
                 else:
-                    print(f"Device {device_index} opened but returned no frame data, trying next...")
+                    print(f"[CAMERA] {dev_path} opened but returned no frame data, trying next...")
                     cam.release()
             else:
-                print(f"Device {device_index} could not be opened.")
+                print(f"[CAMERA] {dev_path} could not be opened.")
         except Exception as e:
-            print(f"Error opening device {device_index}: {e}")
+            print(f"[CAMERA] Error opening {dev_path}: {e}")
 
     print("All camera devices failed to provide usable frames!")
     return None
