@@ -183,9 +183,32 @@ async def detect_vehicle(file: UploadFile = File(...)):
                         
                         avg_conf = total_conf / len(valid_texts)
                         
-                        # Must be 4-8 characters and high confidence
-                        if 4 <= len(dedup_text) <= 8 and avg_conf > best_conf:
-                            best_plate = dedup_text
+                        ph_patterns = [
+                            re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
+                            re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
+                            re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
+                        ]
+                        
+                        found_plate = None
+                        for pattern in ph_patterns:
+                            if pattern.match(dedup_text):
+                                found_plate = dedup_text
+                                break
+                        
+                        if not found_plate:
+                            m = re.search(r'([A-Z]{2,3})(\d{3,4})', dedup_text)
+                            if m:
+                                found_plate = m.group(1) + m.group(2)
+                            else:
+                                m = re.search(r'(\d{3,4})([A-Z]{2,3})', dedup_text)
+                                if m:
+                                    found_plate = m.group(1) + m.group(2)
+                                    
+                        if not found_plate and 4 <= len(dedup_text) <= 8:
+                            found_plate = dedup_text
+                            
+                        if found_plate and avg_conf > best_conf:
+                            best_plate = found_plate
                             best_conf = avg_conf
                             best_boxes = valid_texts
                 
@@ -219,14 +242,23 @@ async def detect_vehicle(file: UploadFile = File(...)):
             elif OCR_AVAILABLE:
                 import pytesseract
                 # Tesseract fallback for Raspberry Pi
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                # Crop to center to avoid UI elements if any
+                h, w = img.shape[:2]
+                y1_roi, y2_roi = int(h * 0.15), int(h * 0.85)
+                x1_roi, x2_roi = int(w * 0.1), int(w * 0.9)
+                roi = img[y1_roi:y2_roi, x1_roi:x2_roi]
+                
+                gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                 # Use slightly larger image for Tesseract if it was compressed heavily
-                h, w = gray.shape
-                upscaled = cv2.resize(gray, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
+                r_h, r_w = gray.shape
+                upscaled = cv2.resize(gray, (r_w * 2, r_h * 2), interpolation=cv2.INTER_CUBIC)
                 _, thresh = cv2.threshold(upscaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                cfg = '--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                cfg = '--psm 11 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
                 raw = pytesseract.image_to_string(thresh, config=cfg)
-                cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                
+                # Removing spaces first so we can parse everything without spaces
+                combined = re.sub(r'\s+', '', raw.upper())
+                cleaned = re.sub(r'[^A-Z0-9]', '', combined)
                 
                 ph_patterns = [
                     re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   

@@ -339,8 +339,27 @@ def get_camera():
     if camera is not None and hasattr(camera, 'isOpened') and camera.isOpened():
         return camera
 
-    # Try V4L2 backend explicitly (required on Raspberry Pi Linux)
-    for device_index in [0, 1, 2]:
+    # On Raspberry Pi, /dev/video0-2 are ISP/metadata nodes, not real cameras.
+    # Use v4l2-ctl to find real capture-capable devices, then fall back to brute-force scan.
+    import subprocess, re as _re
+    candidate_indices = []
+    try:
+        result = subprocess.run(
+            ['v4l2-ctl', '--list-devices'],
+            capture_output=True, text=True, timeout=5
+        )
+        # Extract all /dev/videoN lines and try those first
+        found = _re.findall(r'/dev/video(\d+)', result.stdout)
+        candidate_indices = [int(x) for x in found]
+        print(f"[CAMERA] v4l2-ctl found devices: {[f'/dev/video{i}' for i in candidate_indices]}")
+    except Exception:
+        pass
+    # Also add a wide brute-force fallback range in case v4l2-ctl is missing
+    for extra in range(0, 32):
+        if extra not in candidate_indices:
+            candidate_indices.append(extra)
+
+    for device_index in candidate_indices:
         try:
             print(f"Trying to open VideoCapture({device_index}) with V4L2 backend...")
             # Try V4L2 first (Linux native), fallback to auto
