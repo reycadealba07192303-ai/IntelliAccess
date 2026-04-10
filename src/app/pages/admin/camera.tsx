@@ -11,15 +11,25 @@ import {
     Trash2,
     X,
     Tag,
-    Camera
+    Camera,
+    Cpu,
+    Activity
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 const CameraPage = () => {
     const [selectedCamera, setSelectedCamera] = useState<number>(1);
     const [detectionResult, setDetectionResult] = useState<any>(null);
-    const [isAutoScanning, setIsAutoScanning] = useState(true); // Default to AI auto-scan on
+    const [isAutoScanning, setIsAutoScanning] = useState(true); 
     const [isCapturing, setIsCapturing] = useState(false);
+    
+    const toggleAutoScan = () => setIsAutoScanning(!isAutoScanning);
+    const [isBrainMode, setIsBrainMode] = useState(true);
+    const [brainStatus, setBrainStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+    const [lastBrainResult, setLastBrainResult] = useState<any>(null);
+
+    const brainScanningRef = useRef(false);
+    const BRAIN_URL = "http://localhost:8001";
     const [isProcessing, setIsProcessing] = useState(false);
     const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'found' | 'empty'>('idle');
     const [scanCount, setScanCount] = useState(0);
@@ -446,6 +456,79 @@ const CameraPage = () => {
         };
     }, []);
 
+    // --- Web-Brain Orchestrator (Pi Feed -> Laptop Brain -> Pi Hardware) ---
+    useEffect(() => {
+        let brainInterval: any;
+
+        if (selectedCamera === 1 && isAutoScanning && isBrainMode) {
+            brainInterval = setInterval(async () => {
+                if (brainScanningRef.current || !imgRef.current) return;
+
+                brainScanningRef.current = true;
+                setBrainStatus('scanning');
+
+                try {
+                    // Step 3: Snap Frame from MJPEG Stream using Canvas
+                    const canvas = document.createElement('canvas');
+                    const img = imgRef.current;
+                    canvas.width = 640; // Optimize for YOLO
+                    canvas.height = 480;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) throw new Error("Canvas ctx fail");
+                    
+                    ctx.drawImage(img, 0, 0, 640, 480);
+                    
+                    canvas.toBlob(async (blob) => {
+                        if (!blob) return;
+                        const formData = new FormData();
+                        formData.append('file', blob, 'frame.jpg');
+
+                        try {
+                            // Step 4: Send to Laptop Brain (High Accuracy YOLO+EasyOCR)
+                            const brainRes = await fetch(`${BRAIN_URL}/detect`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (!brainRes.ok) throw new Error("Brain offline");
+                            const result = await brainRes.json();
+
+                            if (result.detected) {
+                                // Step 5: High-Accuracy Plate Found!
+                                setBrainStatus('success');
+                                setDetectionResult(result);
+                                
+                                // Step 7-10: Trigger Pi Hardware (Buzzer, DB, Logs)
+                                await apiFetch("/remote-process", {
+                                    method: "POST",
+                                    body: JSON.stringify({ plate_number: result.plate_number })
+                                });
+                                
+                                toast.success(`High-Accuracy Scan: ${result.plate_number}`, { icon: '🧠' });
+                            } else {
+                                setBrainStatus('idle');
+                            }
+                        } catch (err) {
+                            setBrainStatus('error');
+                            console.error("Brain Error:", err);
+                        } finally {
+                            brainScanningRef.current = false;
+                        }
+                    }, 'image/jpeg', 0.8);
+
+                } catch (err) {
+                    console.error("Brain Orchestrator Error:", err);
+                    brainScanningRef.current = false;
+                    setBrainStatus('error');
+                }
+            }, 1000); // 1-second interval for stability
+        }
+
+        return () => {
+            if (brainInterval) clearInterval(brainInterval);
+        };
+    }, [selectedCamera, isAutoScanning, isBrainMode]);
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -455,8 +538,47 @@ const CameraPage = () => {
         >
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Camera Surveillance</h1>
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                        Camera Surveillance
+                        {isBrainMode && (
+                            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1.5">
+                                <div className={`h-1.5 w-1.5 rounded-full ${brainStatus === 'error' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                                PC BRAIN ACTIVE
+                            </span>
+                        )}
+                    </h1>
                     <p className="text-slate-400">Real-time monitoring and security feeds.</p>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => setIsBrainMode(!isBrainMode)}
+                        className={`group relative flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+                            isBrainMode 
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
+                            : "bg-slate-800/50 border-white/5 text-slate-400 grayscale"
+                        }`}
+                    >
+                        <div className={`p-1 rounded-lg ${isBrainMode ? "bg-emerald-500/20" : "bg-slate-700"}`}>
+                            <Cpu className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col items-start leading-none gap-1">
+                            <span className="text-xs font-bold uppercase tracking-wider">AI Brain Mode</span>
+                            <span className="text-[8px] opacity-60 font-medium whitespace-nowrap">Offload to PC (Accuracy: High)</span>
+                        </div>
+                    </button>
+                    
+                    <button
+                        onClick={toggleAutoScan}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all ${
+                            isAutoScanning
+                                ? "bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                                : "bg-slate-800 text-slate-400 border border-white/5"
+                        }`}
+                    >
+                        <div className={`h-2 w-2 rounded-full ${isAutoScanning ? "bg-black animate-pulse" : "bg-slate-600"}`} />
+                        {isAutoScanning ? "SCANNERS ACTIVE" : "ENABLE SCANNERS"}
+                    </button>
                 </div>
             </div>
 

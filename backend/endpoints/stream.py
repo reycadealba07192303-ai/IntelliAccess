@@ -74,6 +74,9 @@ LOG_COOLDOWN_SECONDS = 60 # Wait 60 seconds before logging the exact same plate 
 # Latest Scan Result for frontend polling
 latest_scan_result = None
 latest_frame_bytes = None  # Global buffer for the latest JPEG frame
+latest_frame_raw = None    # Global buffer for the latest raw CV2 frame
+
+os.makedirs("static/captures", exist_ok=True)
 
 import os
 from utils.sms import send_access_sms
@@ -320,6 +323,18 @@ def log_plate_detection(plate_text: str, frame=None):
     except Exception as e:
          print(f"Error logging plate detection: {e}")
 
+from pydantic import BaseModel
+class RemoteResultRequest(BaseModel):
+    plate_number: str
+
+@router.post("/remote-process")
+async def remote_process_plate(req: RemoteResultRequest):
+    """Bridge for PC Brain to trigger Pi Hardware (Steps 7-10)."""
+    print(f"[REMOTE BRAIN] Received high-accuracy result: {req.plate_number}")
+    # Use the captured raw frame from the camera loop
+    log_plate_detection(req.plate_number, latest_frame_raw)
+    return {"status": "success", "detail": f"Hardware triggered for {req.plate_number}"}
+
 def load_models():
     global model, reader
     if AI_AVAILABLE and model is None:
@@ -432,6 +447,9 @@ def camera_background_task():
             if not success:
                 time.sleep(0.1)
                 continue
+            
+            # Store raw frame for the PC Brain to use during remote processing
+            latest_frame_raw = frame.copy() if frame is not None else None
 
             # Run detection every DETECTION_INTERVAL frames
             if frame_counter % DETECTION_INTERVAL == 0:

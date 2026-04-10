@@ -270,27 +270,31 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 
                 _last_laptop_gray = gray_small
                 
-                # Step 4: Preprocess Image (Adaptive Contrast + Sharpening)
+                # Step 4: Preprocess Image (Adaptive Contrast + Sharpening + Morph)
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                 
-                # Boost contrast (important for digital screens)
+                # Boost contrast (CLAHE)
                 clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
                 enhanced = clahe.apply(gray)
-                enhanced = clahe.apply(gray_roi)
                 
-                # Sharpening kernel
+                # Sharpen character edges
                 kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
                 sharpened = cv2.filter2D(enhanced, -1, kernel)
                 
-                # Denoise
-                denoised = cv2.bilateralFilter(sharpened, 11, 17, 17)
+                # Bi-lateral filter for noise reduction while keeping edges
+                denoised = cv2.bilateralFilter(sharpened, 9, 75, 75)
                 
                 # Step 5: OCR (Read Plate with Inversion Check)
-                # Adaptive thresholding 
+                # Adaptive threshold for standard and inverted views
                 thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                                 cv2.THRESH_BINARY, 11, 2)
                 
+                # Morphological Clean (remove small noise points)
+                kernel_morph = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+                thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel_morph)
+                
                 best_plate = None
+                print(f"[AI] Step 5: OCR Analyzing {w}x{h} ROI...")
                 for invert in [False, True]:
                     img_to_ocr = cv2.bitwise_not(thresh) if invert else thresh
                     for psm in [7, 8, 11]:
