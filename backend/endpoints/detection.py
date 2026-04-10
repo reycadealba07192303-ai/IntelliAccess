@@ -51,6 +51,10 @@ except Exception as e:
 _plate_cooldown = {}
 COOLDOWN_SECONDS = 60  # Ignore same plate for 60 seconds after first detection
 
+# Motion Detection Latch for Laptop Webcam (POST requests)
+_last_laptop_gray = None
+_LAPTOP_MOTION_THRESHOLD = 500
+
 @router.post("/detect")
 async def detect_vehicle(file: UploadFile = File(...)):
     print(f"[DETECT] Received request from client... ({datetime.now().strftime('%H:%M:%S')})")
@@ -241,13 +245,30 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     print(f"[AI] Plate detected: {plate_text} | Confidence: {confidence}% | Box: {plate_box}")
             
             elif OCR_AVAILABLE:
+                global _last_laptop_gray
                 import pytesseract
                 # Tesseract fallback for Raspberry Pi
-                # Crop to center to avoid UI elements and focus on the plate
+                
+                # Step 3: Crop Plate (Matching UI Dashed Box: 60% wide, 40% high)
                 h, w = img.shape[:2]
-                y1, y2 = int(h * 0.1), int(h * 0.9)
-                x1, x2 = int(w * 0.1), int(w * 0.9)
+                y1, y2 = int(h * 0.3), int(h * 0.7)
+                x1, x2 = int(w * 0.2), int(w * 0.8)
                 roi = img[y1:y2, x1:x2]
+                
+                # Step 2: Motion Detection (Optional but recommended)
+                roi_small = cv2.resize(roi, (100, 100))
+                gray_small = cv2.cvtColor(roi_small, cv2.COLOR_BGR2GRAY)
+                gray_small = cv2.GaussianBlur(gray_small, (21, 21), 0)
+                
+                if _last_laptop_gray is not None:
+                    delta = cv2.absdiff(_last_laptop_gray, gray_small)
+                    thresh_delta = cv2.threshold(delta, 25, 255, cv2.THRESH_BINARY)[1]
+                    movement = cv2.countNonZero(thresh_delta)
+                    if movement < _LAPTOP_MOTION_THRESHOLD:
+                        _last_laptop_gray = gray_small
+                        return {"status": "success", "detected": False, "detail": "No motion detected (Step 2)"}
+                
+                _last_laptop_gray = gray_small
                 
                 # Step 4: Preprocess Image (Enhanced)
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
