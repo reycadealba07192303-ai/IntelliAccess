@@ -548,37 +548,48 @@ def _ocr_background_worker():
                 
             print(f"[MOTION] Detected movement ({movement}), running OCR...")
 
-            # Step 4: Preprocess Image (Improved)
-            # Upscale 2x for speed vs accuracy balance on Pi
-            roi_up = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+            # Step 4: Preprocess Image (Adaptive Contrast + Sharpening)
+            # Upscale 2x for better character definition on small plates
+            roi_up = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
             gray_roi = cv2.cvtColor(roi_up, cv2.COLOR_BGR2GRAY)
             
-            # Denoise and sharpen
-            denoised = cv2.bilateralFilter(gray_roi, 11, 17, 17)
+            # Apply CLAHE for local contrast balancing
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray_roi)
             
-            # Step 5: OCR (Read Plate)
-            # Adaptive thresholding and multiple PSM check
+            # Sharpening kernel
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(enhanced, -1, kernel)
+            
+            # Denoise
+            denoised = cv2.bilateralFilter(sharpened, 11, 17, 17)
+            
+            # Step 5: OCR (Read Plate with Inversion Check)
+            # Adaptive thresholding 
             thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                             cv2.THRESH_BINARY, 11, 2)
             
             best_plate = None
-            for psm in [7, 8]:
-                cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                try:
-                    raw = pytesseract.image_to_string(thresh, config=cfg)
-                    cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
-                    
-                    if cleaned and 3 <= len(cleaned) <= 8:
-                        for pattern in ph_patterns:
-                            if pattern.match(cleaned):
-                                best_plate = cleaned
-                                break
-                        if not best_plate:
-                             m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
-                             if m: best_plate = m.group(0)
+            for invert in [False, True]:
+                img_to_ocr = cv2.bitwise_not(thresh) if invert else thresh
+                for psm in [7, 8, 11]:
+                    cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                    try:
+                        raw = pytesseract.image_to_string(img_to_ocr, config=cfg)
+                        cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
                         
-                        if best_plate: break
-                except Exception: pass
+                        if cleaned and 3 <= len(cleaned) <= 8:
+                            for pattern in ph_patterns:
+                                if pattern.match(cleaned):
+                                    best_plate = cleaned
+                                    break
+                            if not best_plate:
+                                 m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
+                                 if m: best_plate = m.group(0)
+                            
+                            if best_plate: break
+                    except Exception: pass
+                if best_plate: break
 
             if not best_plate and cleaned and 4 <= len(cleaned) <= 8:
                 best_plate = cleaned

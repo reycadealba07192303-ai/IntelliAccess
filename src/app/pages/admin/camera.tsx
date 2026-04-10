@@ -494,16 +494,16 @@ const CameraPage = () => {
                                                 boxShadow: scanStatus === 'scanning' ? '0 0 0 1000px rgba(0,0,0,0.5)' : '0 0 0 1000px rgba(0,0,0,0.3)'
                                             }}>
                                             
-                                            {/* Step 2-5 Status Indicator */}
-                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+                                            {/* Step 2-5 Status Indicator - MOVED INSIDE FOR VISIBILITY */}
+                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 w-full px-2">
                                                 {scanStatus === 'scanning' ? (
-                                                    <div className="flex items-center gap-2 bg-emerald-500 text-black font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-tight shadow-lg">
+                                                    <div className="flex items-center gap-2 bg-emerald-500 text-black font-black text-[9px] px-3 py-1 rounded shadow-lg animate-pulse uppercase tracking-tighter whitespace-nowrap">
                                                         <div className="h-1.5 w-1.5 bg-black rounded-full animate-ping" />
-                                                        AI Reading Plate
+                                                        Step 5: OCR Reading
                                                     </div>
                                                 ) : (
-                                                    <div className="text-white/30 font-bold text-[8px] uppercase tracking-widest">
-                                                        [ ROI SCAN AREA ]
+                                                    <div className="text-white/40 font-bold text-[8px] uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded backdrop-blur-sm border border-white/5">
+                                                        Step 2: Monitoring
                                                     </div>
                                                 )}
                                             </div>
@@ -542,27 +542,27 @@ const CameraPage = () => {
                                             height: '40%',
                                             boxShadow: '0 0 0 1000px rgba(0,0,0,0.4)'
                                         }}>
-                                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 w-full px-2">
                                                 {scanStatus === 'scanning' ? (
                                                     <motion.div 
                                                         initial={{ scale: 0.8, opacity: 0 }}
                                                         animate={{ scale: 1, opacity: 1 }}
-                                                        className="flex items-center gap-3 bg-emerald-500 text-black font-black text-[10px] px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] uppercase tracking-tighter"
+                                                        className="flex items-center gap-2 bg-emerald-500 text-black font-black text-[10px] px-4 py-1.5 rounded shadow-[0_0_20px_rgba(16,185,129,0.5)] uppercase tracking-tighter whitespace-nowrap"
                                                     >
                                                         <div className="h-2 w-2 bg-black rounded-full animate-pulse" />
-                                                        Step 5: OCR Reading...
+                                                        AI ANALYZING PLATE...
                                                     </motion.div>
                                                 ) : scanStatus === 'found' ? (
                                                     <motion.div 
                                                         initial={{ y: 5, opacity: 0 }}
                                                         animate={{ y: 0, opacity: 1 }}
-                                                        className="bg-blue-500 text-white font-black text-[10px] px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)] uppercase tracking-tighter"
+                                                        className="bg-blue-500 text-white font-black text-[10px] px-4 py-1.5 rounded shadow-[0_0_20px_rgba(59,130,246,0.5)] uppercase tracking-tighter whitespace-nowrap"
                                                     >
-                                                        Step 7-10: Plate Verified!
+                                                        SUCCESS! PLATE VERIFIED
                                                     </motion.div>
                                                 ) : (
-                                                    <div className="text-white/40 font-bold text-[9px] uppercase tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm border border-white/5">
-                                                        Step 2: Monitoring Motion...
+                                                    <div className="text-white/60 font-black text-[9px] uppercase tracking-widest bg-black/60 px-3 py-1 rounded border border-white/10 backdrop-blur-sm">
+                                                        [ ROI TARGET ]
                                                     </div>
                                                 )}
                                             </div>

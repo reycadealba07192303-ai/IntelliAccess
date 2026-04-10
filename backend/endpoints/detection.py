@@ -53,7 +53,7 @@ COOLDOWN_SECONDS = 60  # Ignore same plate for 60 seconds after first detection
 
 # Motion Detection Latch for Laptop Webcam (POST requests)
 _last_laptop_gray = None
-_LAPTOP_MOTION_THRESHOLD = 500
+_LAPTOP_MOTION_THRESHOLD = 200 # Lowered from 500 to be more sensitive
 
 @router.post("/detect")
 async def detect_vehicle(file: UploadFile = File(...)):
@@ -270,35 +270,48 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 
                 _last_laptop_gray = gray_small
                 
-                # Step 4: Preprocess Image (Enhanced)
+                # Step 4: Preprocess Image (Adaptive Contrast + Sharpening)
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                
+                # Boost contrast (important for digital screens)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                enhanced = clahe.apply(gray)
+                enhanced = clahe.apply(gray_roi)
+                
+                # Sharpening kernel
+                kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+                sharpened = cv2.filter2D(enhanced, -1, kernel)
+                
                 # Denoise
-                denoised = cv2.bilateralFilter(gray, 11, 17, 17)
+                denoised = cv2.bilateralFilter(sharpened, 11, 17, 17)
+                
+                # Step 5: OCR (Read Plate with Inversion Check)
                 # Adaptive thresholding 
                 thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                                 cv2.THRESH_BINARY, 11, 2)
                 
-                # Step 5: OCR (Read Plate)
                 best_plate = None
-                for psm in [7, 8]:
-                    cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                    raw = pytesseract.image_to_string(thresh, config=cfg)
-                    
-                    # Step 6: Clean text
-                    combined = re.sub(r'\s+', '', raw.upper())
-                    cleaned = re.sub(r'[^A-Z0-9]', '', combined)
-                    
-                    if cleaned and 3 <= len(cleaned) <= 8:
-                        for pattern in ph_patterns:
-                            if pattern.match(cleaned):
-                                best_plate = cleaned
-                                break
-                        if not best_plate:
-                             m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
-                             if m: best_plate = m.group(0)
-                        
-                        if best_plate: break
-                
+                for invert in [False, True]:
+                    img_to_ocr = cv2.bitwise_not(thresh) if invert else thresh
+                    for psm in [7, 8, 11]:
+                        cfg = f'--psm {psm} --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                        try:
+                            raw = pytesseract.image_to_string(img_to_ocr, config=cfg)
+                            cleaned = re.sub(r'[^A-Z0-9]', '', raw.upper())
+                            
+                            if cleaned and 3 <= len(cleaned) <= 8:
+                                for pattern in ph_patterns:
+                                    if pattern.match(cleaned):
+                                        best_plate = cleaned
+                                        break
+                                if not best_plate:
+                                     m = re.search(r'([A-Z]{2,3}\d{3,4})|(\d{3,4}[A-Z]{2,3})', cleaned)
+                                     if m: best_plate = m.group(0)
+                                
+                                if best_plate: break
+                        except Exception: pass
+                    if best_plate: break
+
                 if not best_plate and cleaned and 4 <= len(cleaned) <= 8:
                     best_plate = cleaned
 
