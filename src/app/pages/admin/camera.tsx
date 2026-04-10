@@ -460,24 +460,27 @@ const CameraPage = () => {
     useEffect(() => {
         let brainInterval: any;
 
-        if (selectedCamera === 1 && isAutoScanning && isBrainMode) {
+        if (isAutoScanning && isBrainMode) {
             brainInterval = setInterval(async () => {
-                if (brainScanningRef.current || !imgRef.current) return;
+                const source = imgRef.current || videoRef.current;
+                if (brainScanningRef.current || !source) return;
 
                 brainScanningRef.current = true;
                 setBrainStatus('scanning');
+                setScanStatus('scanning');
 
                 try {
-                    // Step 3: Snap Frame from MJPEG Stream using Canvas
+                    // Step 3: Snap Frame (from MJPEG img or Laptop video)
                     const canvas = document.createElement('canvas');
-                    const img = imgRef.current;
-                    canvas.width = 640; // Optimize for YOLO
+                    canvas.width = 640; 
                     canvas.height = 480;
                     const ctx = canvas.getContext('2d');
                     if (!ctx) throw new Error("Canvas ctx fail");
                     
-                    ctx.drawImage(img, 0, 0, 640, 480);
+                    ctx.drawImage(source, 0, 0, 640, 480);
                     
+                    const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
                     canvas.toBlob(async (blob) => {
                         if (!blob) return;
                         const formData = new FormData();
@@ -496,17 +499,23 @@ const CameraPage = () => {
                             if (result.detected) {
                                 // Step 5: High-Accuracy Plate Found!
                                 setBrainStatus('success');
+                                setScanStatus('found');
                                 setDetectionResult(result);
                                 
-                                // Step 7-10: Trigger Pi Hardware (Buzzer, DB, Logs)
+                                // Step 7-10: Trigger Pi Hardware + Upload Image
                                 await apiFetch("/remote-process", {
                                     method: "POST",
-                                    body: JSON.stringify({ plate_number: result.plate_number })
+                                    body: JSON.stringify({ 
+                                        plate_number: result.plate_number,
+                                        image_base64: imageBase64
+                                    })
                                 });
                                 
                                 toast.success(`High-Accuracy Scan: ${result.plate_number}`, { icon: '🧠' });
                             } else {
                                 setBrainStatus('idle');
+                                // Only reset scanStatus if not actively finding something
+                                setTimeout(() => setScanStatus('idle'), 1000);
                             }
                         } catch (err) {
                             setBrainStatus('error');
@@ -521,7 +530,7 @@ const CameraPage = () => {
                     brainScanningRef.current = false;
                     setBrainStatus('error');
                 }
-            }, 1000); // 1-second interval for stability
+            }, 500); // 500ms interval for fast scanning (满足 5s 目标)
         }
 
         return () => {

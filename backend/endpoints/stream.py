@@ -324,16 +324,30 @@ def log_plate_detection(plate_text: str, frame=None):
     except Exception as e:
          print(f"Error logging plate detection: {e}")
 
-from pydantic import BaseModel
+from typing import Optional
 class RemoteResultRequest(BaseModel):
     plate_number: str
+    image_base64: Optional[str] = None
 
 @router.post("/remote-process")
 async def remote_process_plate(req: RemoteResultRequest):
     """Bridge for PC Brain to trigger Pi Hardware (Steps 7-10)."""
     print(f"[REMOTE BRAIN] Received high-accuracy result: {req.plate_number}")
-    # Use the captured raw frame from the camera loop
-    log_plate_detection(req.plate_number, latest_frame_raw)
+    
+    frame = latest_frame_raw
+    
+    # If UI provided a specific frame (from Laptop Webcam), use it!
+    if req.image_base64:
+        try:
+            import base64
+            img_data = base64.b64decode(req.image_base64.split(",")[-1])
+            nparr = np.frombuffer(img_data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        except Exception as e:
+            print(f"Error decoding remote image: {e}")
+            
+    # Use the captured or provided raw frame
+    log_plate_detection(req.plate_number, frame)
     return {"status": "success", "detail": f"Hardware triggered for {req.plate_number}"}
 
 def load_models():
