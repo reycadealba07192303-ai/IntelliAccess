@@ -375,6 +375,23 @@ async def remote_process_plate(req: RemoteResultRequest):
     log_plate_detection(req.plate_number, frame)
     return {"status": "success", "detail": f"Hardware triggered for {req.plate_number}"}
 
+@router.get("/debug-captures")
+async def debug_captures():
+    """Diagnostic endpoint to check capture storage."""
+    try:
+        import os
+        files = os.listdir(CAPTURES_DIR)
+        return {
+            "captures_dir": CAPTURES_DIR,
+            "exists": os.path.exists(CAPTURES_DIR),
+            "file_count": len(files),
+            "sample_files": files[:10],
+            "is_writable": os.access(CAPTURES_DIR, os.W_OK),
+            "cwd": os.getcwd()
+        }
+    except Exception as e:
+        return {"error": str(e), "path": CAPTURES_DIR}
+
 def load_models():
     global model, reader
     if AI_AVAILABLE and model is None:
