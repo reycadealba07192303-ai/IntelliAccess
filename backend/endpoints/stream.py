@@ -217,26 +217,31 @@ def log_plate_detection(plate_text: str, frame=None):
                 sort=[("timestamp", -1)]
             )
             
-            if last_log and last_log.get("action") == "Entry":
-                # Only allow an Exit if the Entry was at least 60 seconds ago
+            if last_log:
+                last_log_action = last_log.get("action")
                 last_log_time_str = last_log.get("timestamp")
+                
                 if last_log_time_str:
                     try:
                         last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
-                        if 60 < time_diff < 43200: # Between 1 minute and 12 hours -> natural Exit
-                            action = "Exit"
-                        elif time_diff >= 43200: # Greater than 12 hours -> assumed to be a new day Entry
-                            action = "Entry"
-                        else:
-                            print(f"[STREAM DETECT] Ignored. Vehicle {plate_text} recently entered ({time_diff:.1f}s ago).")
+                        
+                        # MANDATORY 1-MINUTE COOLDOWN BETWEEN ANY STATE CHANGE
+                        if time_diff < 60:
+                            print(f"[STREAM DETECT] Ignored. Vehicle {plate_text} recently {last_log_action.lower()}ed ({time_diff:.1f}s ago).")
                             action = "Ignored"
+                        else:
+                            # TICKET TOGGLE: Entry -> Exit, Exit -> Entry
+                            action = "Exit" if last_log_action == "Entry" else "Entry"
+                            
                     except Exception as e:
                         print(f"Time parsing error: {e}")
-                        action = "Exit"
+                        action = "Entry"
                 else:
-                    action = "Exit"
-                
+                    action = "Entry"
+            else:
+                # No history? Start with Entry.
+                action = "Entry"
         # Insert access log
         log_entry_id = f"ignored_{int(current_time)}"
         try:
