@@ -22,6 +22,7 @@ const CameraPage = () => {
     const [detectionResult, setDetectionResult] = useState<any>(null);
     const [isAutoScanning, setIsAutoScanning] = useState(true); 
     const [isCapturing, setIsCapturing] = useState(false);
+    const [brainImageBaseUrl, setBrainImageBaseUrl] = useState(API_BASE_URL);
     
     const toggleAutoScan = () => setIsAutoScanning(!isAutoScanning);
     const [isBrainMode, setIsBrainMode] = useState(true);
@@ -495,11 +496,11 @@ const CameraPage = () => {
                             
                             if (!brainRes.ok) throw new Error("Brain offline");
                             const result = await brainRes.json();
-
                             if (result.detected) {
                                 // Step 5: High-Accuracy Plate Found!
                                 setBrainStatus('success');
                                 setScanStatus('found');
+                                setBrainImageBaseUrl(BRAIN_URL);
                                 setDetectionResult(result);
                                 
                                 // Step 7-10: Trigger Pi Hardware + Upload Image

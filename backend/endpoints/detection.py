@@ -177,41 +177,12 @@ async def detect_vehicle(file: UploadFile = File(...)):
                         
                         # Remove duplicate consecutive characters (e.g., "77" -> "7")
                         combined_text = "".join([item['text'] for item in valid_texts])
-                        # Remove non-alphanumeric and duplicates
+                        # Clean the text: remove non-alphanumeric and keep original repeating characters
                         clean_text = re.sub(r'[^A-Z0-9]', '', combined_text).upper()
-                        
-                        # Deduplicate consecutive identical characters
-                        dedup_text = ""
-                        for i, char in enumerate(clean_text):
-                            if i == 0 or char != clean_text[i-1]:
-                                dedup_text += char
+                        found_plate = clean_text
                         
                         avg_conf = total_conf / len(valid_texts)
                         
-                        ph_patterns = [
-                            re.compile(r'^[A-Z]{2,3}\d{3,4}$'),   
-                            re.compile(r'^\d{3,4}[A-Z]{2,3}$'),   
-                            re.compile(r'^[A-Z]{1,2}\d{3,4}[A-Z]?$'), 
-                        ]
-                        
-                        found_plate = None
-                        for pattern in ph_patterns:
-                            if pattern.match(dedup_text):
-                                found_plate = dedup_text
-                                break
-                        
-                        if not found_plate:
-                            m = re.search(r'([A-Z]{2,3})(\d{3,4})', dedup_text)
-                            if m:
-                                found_plate = m.group(1) + m.group(2)
-                            else:
-                                m = re.search(r'(\d{3,4})([A-Z]{2,3})', dedup_text)
-                                if m:
-                                    found_plate = m.group(1) + m.group(2)
-                                    
-                        if not found_plate and 4 <= len(dedup_text) <= 8:
-                            found_plate = dedup_text
-                            
                         if found_plate and avg_conf > best_conf:
                             best_plate = found_plate
                             best_conf = avg_conf
