@@ -67,10 +67,10 @@ import queue
 ocr_queue = queue.Queue(maxsize=1) # Only store latest frame for OCR to avoid backlog
 ocr_worker_active = False
 
-# Cooldown tracking
-last_logged_plate = None
-last_logged_time = 0
-LOG_COOLDOWN_SECONDS = 60 # Wait 60 seconds before logging the exact same plate again
+# Cooldown tracking (Per-plate dictionary)
+# Format: { "ABC-123": timestamp }
+plate_cooldowns = {}
+LOG_COOLDOWN_SECONDS = 60 
 
 # Latest Scan Result for frontend polling
 latest_scan_result = None
@@ -90,7 +90,7 @@ except Exception:
     def buzz_denied(): pass
 
 def log_plate_detection(plate_text: str, frame=None):
-    global last_logged_plate, last_logged_time, latest_scan_result
+    global latest_scan_result, plate_cooldowns
     
     # Clean up the text: remove non-alphanumeric (keep hyphens and spaces)
     import re
@@ -106,19 +106,16 @@ def log_plate_detection(plate_text: str, frame=None):
         return
         
     current_time = time.time()
+    
+    # Cooldown logic (PER PLATE)
+    # If THIS specific plate was logged less than 60s ago, ignore it.
+    if plate_text in plate_cooldowns:
+        last_time = plate_cooldowns[plate_text]
+        if (current_time - last_time) < LOG_COOLDOWN_SECONDS:
+            return
+            
     # Update frontend polling object REGARDLESS of cooldown
-    # This provides the "Live Green Box" indicator
-    latest_scan_result = {
-        "id": f"live_{int(current_time*10)}", 
-        "timestamp": current_time,
-        "plate_number": plate_text,
-        "detected": True,
-        "plate_box": { "x": 0.1, "y": 0.1, "w": 0.8, "h": 0.8 } # Simulated box centered in ROI
-    }
-
-    # Cooldown logic for DATABASE logging only
-    if plate_text == last_logged_plate and (current_time - last_logged_time) < LOG_COOLDOWN_SECONDS:
-        return
+    # (So the user still sees the green box on screen)
         
     try:
         # Check if authorized
@@ -317,9 +314,12 @@ def log_plate_detection(plate_text: str, frame=None):
             "image_url": image_url
         }
         
-        # Update cooldown
-        last_logged_plate = plate_text
-        last_logged_time = current_time
+        # Update per-plate cooldown
+        plate_cooldowns[plate_text] = current_time
+        
+        # Cleanup old cooldowns to save memory (older than 10 mins)
+        if len(plate_cooldowns) > 100:
+            plate_cooldowns = {p: t for p, t in plate_cooldowns.items() if (current_time - t) < 600}
         
     except Exception as e:
          print(f"Error logging plate detection: {e}")
