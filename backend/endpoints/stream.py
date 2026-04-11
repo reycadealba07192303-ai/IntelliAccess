@@ -194,16 +194,28 @@ def log_plate_detection(plate_text: str, frame=None):
              
         # Save frame capture
         image_url = None
-        if frame is not None:
+        # NumPy array check: if frame is not None is ambiguous for multi-element arrays
+        has_frame = frame is not None and hasattr(frame, 'shape')
+        
+        if has_frame:
              try:
                  filename = f"capture_{int(current_time)}.jpg"
                  filepath = os.path.join(CAPTURES_DIR, filename)
+                 
+                 # Ensure directory exists one more time just in case of disk issues
+                 if not os.path.exists(CAPTURES_DIR):
+                     os.makedirs(CAPTURES_DIR, exist_ok=True)
+                     
                  success = cv2.imwrite(filepath, frame)
                  if success:
                      image_url = f"/static/captures/{filename}"
                      print(f"[STREAM DETECT] Image saved successfully: {filepath}")
                  else:
-                     print(f"[STREAM DETECT] Failed to save image to: {filepath}")
+                     # Check if we have write permissions
+                     if not os.access(os.path.dirname(filepath), os.W_OK):
+                        print(f"[STREAM DETECT] CRITICAL: No write permission for {CAPTURES_DIR}")
+                     else:
+                        print(f"[STREAM DETECT] Failed to save image to: {filepath} (Reason unknown)")
              except Exception as write_err:
                  print(f"[STREAM DETECT] Error during image write: {write_err}")
              
