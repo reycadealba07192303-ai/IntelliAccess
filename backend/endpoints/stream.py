@@ -77,9 +77,11 @@ latest_scan_result = None
 latest_frame_bytes = None  # Global buffer for the latest JPEG frame
 latest_frame_raw = None    # Global buffer for the latest raw CV2 frame
 
-os.makedirs("static/captures", exist_ok=True)
+# Ensure captures directory exists (Absolute Path)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CAPTURES_DIR = os.path.join(BASE_DIR, "static", "captures")
+os.makedirs(CAPTURES_DIR, exist_ok=True)
 
-import os
 from utils.sms import send_access_sms
 try:
     from utils.buzzer import buzz_granted, buzz_denied
@@ -88,9 +90,8 @@ except Exception:
     BUZZER_AVAILABLE = False
     def buzz_granted(): pass
     def buzz_denied(): pass
-
 def log_plate_detection(plate_text: str, frame=None):
-    global latest_scan_result, plate_cooldowns
+    global latest_scan_result, plate_cooldowns, CAPTURES_DIR
     
     # Clean up the text: remove non-alphanumeric (keep hyphens and spaces)
     import re
@@ -192,13 +193,19 @@ def log_plate_detection(plate_text: str, frame=None):
              status = "Denied (Unregistered)"
              
         # Save frame capture
-        os.makedirs("static/captures", exist_ok=True)
         image_url = None
         if frame is not None:
-             filename = f"capture_{int(current_time)}.jpg"
-             filepath = os.path.join("static", "captures", filename)
-             cv2.imwrite(filepath, frame)
-             image_url = f"/static/captures/{filename}"
+             try:
+                 filename = f"capture_{int(current_time)}.jpg"
+                 filepath = os.path.join(CAPTURES_DIR, filename)
+                 success = cv2.imwrite(filepath, frame)
+                 if success:
+                     image_url = f"/static/captures/{filename}"
+                     print(f"[STREAM DETECT] Image saved successfully: {filepath}")
+                 else:
+                     print(f"[STREAM DETECT] Failed to save image to: {filepath}")
+             except Exception as write_err:
+                 print(f"[STREAM DETECT] Error during image write: {write_err}")
              
         # Check last action for this vehicle to determine Entry vs Exit
         action = "Entry"
