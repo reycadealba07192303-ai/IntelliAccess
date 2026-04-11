@@ -46,7 +46,10 @@ class LimitUploadSize(BaseHTTPMiddleware):
 
 app.add_middleware(LimitUploadSize, max_upload_size=50_000_000) # 50MB
 
+# Ensure required directories exist
 os.makedirs("static/profiles", exist_ok=True)
+os.makedirs("static/captures", exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
