@@ -20,6 +20,13 @@ def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user)):
         vehicle_dict = vehicle.dict(exclude_unset=True)
         vehicle_dict["status"] = "Active"
         
+        # Auto-generate RFID UID if not provided
+        if not vehicle_dict.get("rfid_tag"):
+            import random, string
+            random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            vehicle_dict["rfid_tag"] = f"AUTO-{random_id}"
+            print(f"[VEHICLES] Auto-generated RFID tag for {vehicle.plate_number}: {vehicle_dict['rfid_tag']}")
+        
         # Assign owner_id from the authenticated user
         if user and "id" in user:
             vehicle_dict["owner_id"] = user["id"]

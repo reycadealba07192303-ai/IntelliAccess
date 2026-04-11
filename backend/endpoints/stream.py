@@ -45,6 +45,8 @@ except Exception as e:
     PICAMERA_AVAILABLE = False
 
 try:
+    from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream, detection, camera_server
+    from utils.access_utils import set_cooldown, is_on_cooldown
     from mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
     DB_AVAILABLE = True
 except ImportError:
@@ -108,12 +110,9 @@ def log_plate_detection(plate_text: str, frame=None):
         
     current_time = time.time()
     
-    # Cooldown logic (PER PLATE)
-    # If THIS specific plate was logged less than 60s ago, ignore it.
-    if plate_text in plate_cooldowns:
-        last_time = plate_cooldowns[plate_text]
-        if (current_time - last_time) < LOG_COOLDOWN_SECONDS:
-            return
+    # Cooldown logic (Quick check by plate text first)
+    if is_on_cooldown(plate_text):
+        return
             
     # Update frontend polling object REGARDLESS of cooldown
     # (So the user still sees the green box on screen)
@@ -185,6 +184,12 @@ def log_plate_detection(plate_text: str, frame=None):
             v_status = vehicle.get("status", "").strip().upper()
             if v_status == "ACTIVE":
                 status = "Authorized"
+            
+            # Check for Vehicle-ID based cooldown
+            vehicle_id = str(vehicle["_id"])
+            if is_on_cooldown(vehicle_id):
+                print(f"[STREAM] Ignoring {plate_text} - recently logged via ID {vehicle_id}")
+                return
             elif v_status == "PENDING":
                  status = "Denied (Pending)"
             elif v_status == "BLACKLISTED":
@@ -338,12 +343,10 @@ def log_plate_detection(plate_text: str, frame=None):
             "image_url": image_url
         }
         
-        # Update per-plate cooldown
-        plate_cooldowns[plate_text] = current_time
-        
-        # Cleanup old cooldowns to save memory (older than 10 mins)
-        if len(plate_cooldowns) > 100:
-            plate_cooldowns = {p: t for p, t in plate_cooldowns.items() if (current_time - t) < 600}
+        # Update cooldowns for both plate and vehicle ID
+        set_cooldown(plate_text)
+        if vehicle_info:
+            set_cooldown(vehicle_info.get("id"))
         
     except Exception as e:
          print(f"Error logging plate detection: {e}")

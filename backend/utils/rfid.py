@@ -8,6 +8,7 @@ import time
 import threading
 from typing import Optional
 from datetime import datetime
+from utils.access_utils import is_on_cooldown, set_cooldown, trigger_hardware_success, trigger_hardware_denied
 
 # ─── Shared State (used by both Camera AI and RFID modules) ───────────────────
 # This is the single source of truth for the last access event regardless of method
@@ -118,11 +119,11 @@ def _process_rfid_tag(tag_id: str):
 
     current_time = time.time()
 
-    # Deduplication: if camera recently logged this same vehicle, skip
-    if tag_id == rfid_last_tag and (current_time - (latest_rfid_scan or {}).get("timestamp", 0)) < LOG_COOLDOWN_SECONDS:
+    # Check cooldown using shared utility
+    if is_on_cooldown(tag_id):
         return
 
-    rfid_last_tag = tag_id
+    # Database lookup...
 
     if not DB_AVAILABLE:
         return
@@ -149,8 +150,8 @@ def _process_rfid_tag(tag_id: str):
 
             # Get owner phone for SMS
             if vehicle_info.get("owner_id"):
-                from bson import ObjectId
                 try:
+                    from bson import ObjectId
                     owner_doc = users_collection.find_one({"_id": ObjectId(vehicle_info["owner_id"])})
                     if owner_doc:
                         owner_phone = owner_doc.get("phone")
@@ -158,8 +159,19 @@ def _process_rfid_tag(tag_id: str):
                             vehicle_info["owner_name"] = owner_doc.get("name", "Unknown")
                 except Exception as ex:
                     print(f"[RFID] Failed to lookup owner: {ex}")
-        else:
-            status = "Denied (Unregistered RFID)"
+                    
+            # Check Vehicle-ID based cooldown
+            vehicle_id = str(vehicle["_id"])
+            if is_on_cooldown(vehicle_id):
+                print(f"[RFID] Ignoring {tag_id} - recently logged via ID {vehicle_id}")
+                return
+                
+            if v_status == "ACTIVE":
+                status = "Authorized"
+            elif v_status == "PENDING":
+                status = "Denied (Pending)"
+            elif v_status == "BLACKLISTED":
+                status = "Denied (Blacklisted)"
 
         # Check Entry/Exit
         action = "Entry"
@@ -205,6 +217,19 @@ def _process_rfid_tag(tag_id: str):
         else:
             result = denied_logs_collection.insert_one(log_data)
         log_entry_id = str(result.inserted_id)
+
+        # Update cooldowns
+        set_cooldown(tag_id)
+        if vehicle_info:
+            set_cooldown(vehicle_info.get("id"))
+            if vehicle_info.get("plate_number"):
+                set_cooldown(vehicle_info["plate_number"])
+
+        # Trigger Hardware
+        if status == "Authorized":
+            trigger_hardware_success()
+        else:
+            trigger_hardware_denied()
 
         # Send notification + SMS if authorized
         if status == "Authorized" and vehicle_info:

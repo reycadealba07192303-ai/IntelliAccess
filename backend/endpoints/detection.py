@@ -6,7 +6,15 @@ from datetime import datetime
 router = APIRouter()
 
 import platform
+import re
 _is_arm = platform.machine().startswith('arm') or platform.machine().startswith('aarch')
+
+# Philippine plate patterns (standard formats)
+ph_patterns = [
+    re.compile(r'^[A-Z]{3}\d{3,4}$'), # ABC1234
+    re.compile(r'^\d{4}[A-Z]{3}$'),   # 1234ABC (Motorcycles)
+    re.compile(r'^[A-Z]{2}\d{4,5}$'), # AB12345
+]
 
 # Try to import AI libraries, handle failure gracefully
 try:
