@@ -13,10 +13,11 @@ import {
     Tag,
     Camera,
     Cpu,
-    Activity
+    Activity,
+    Loader2
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { apiFetch, API_BASE_URL, getSecureUrl } from "@/lib/api";
 const CameraPage = () => {
     const [selectedCamera, setSelectedCamera] = useState<number>(1);
     const [detectionResult, setDetectionResult] = useState<any>(null);
@@ -30,12 +31,21 @@ const CameraPage = () => {
     const [lastBrainResult, setLastBrainResult] = useState<any>(null);
 
     const brainScanningRef = useRef(false);
-    const BRAIN_URL = "http://localhost:8001";
+    const BRAIN_URL = import.meta.env.VITE_BRAIN_URL || "http://localhost:8001";
     const [isProcessing, setIsProcessing] = useState(false);
     const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'found' | 'empty'>('idle');
     const [scanCount, setScanCount] = useState(0);
     const lastScanTimeRef = useRef<number>(0);
-    const lastScanStatusRef = useRef<'idle' | 'granted' | 'denied'>('idle');
+    const [lastScanStatusRef] = useState<'idle' | 'granted' | 'denied'>('idle');
+
+    // Diagnostic State
+    const [isDiagOpen, setIsDiagOpen] = useState(false);
+    const [diagResults, setDiagResults] = useState<any>({
+        api: 'pending',
+        snapshot: 'pending',
+        mixedContent: 'pending',
+        ngrok: 'pending'
+    });
 
     const [cameras, setCameras] = useState<any[]>([]);
     const [isAddingCamera, setIsAddingCamera] = useState(false);
@@ -139,6 +149,43 @@ const CameraPage = () => {
         label: `${detectionResult.plate_number || 'PLATE'} (${(detectionResult.confidence || 0).toFixed(1)}%)`,
     } : null;
 
+    const runDiagnostics = async () => {
+        setIsDiagOpen(true);
+        setDiagResults({ api: 'scanning', snapshot: 'scanning', mixedContent: 'pending', ngrok: 'pending' });
+
+        const results = { api: 'error', snapshot: 'error', mixedContent: 'safe', ngrok: 'unknown' };
+
+        // 1. Check Mixed Content
+        if (window.location.protocol === 'https:' && API_BASE_URL.startsWith('http:')) {
+            results.mixedContent = 'blocked';
+        }
+
+        // 2. Check API Reachability
+        try {
+            const start = Date.now();
+            await apiFetch('/cameras/available');
+            results.api = `success (${Date.now() - start}ms)`;
+        } catch (e) {
+            results.api = 'failed';
+        }
+
+        // 3. Check Snapshot Utility
+        try {
+            const res = await fetch(`${getSecureUrl(API_BASE_URL)}/snapshot`, {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+            });
+            if (res.ok) results.snapshot = 'success';
+            else results.snapshot = 'failed (Status: ' + res.status + ')';
+        } catch (e) {
+            results.snapshot = 'failed (Network Error)';
+        }
+
+        // 4. Check Ngrok
+        if (API_BASE_URL.includes('ngrok-free.dev')) results.ngrok = 'active';
+
+        setDiagResults(results);
+    };
+
     // --- Backend-Driven Camera & AI Polling ---
     useEffect(() => {
         let scanInterval: NodeJS.Timeout;
@@ -153,7 +200,14 @@ const CameraPage = () => {
             streamInterval = setInterval(async () => {
                 if (!isMounted) return;
                 try {
-                    const res = await fetch(`${API_BASE_URL}/snapshot`, {
+                    // Use the specific camera's URL if selectedCamera > 1, otherwise use default API snapshot
+                    const targetUrl = selectedCamera === 1 
+                        ? `${API_BASE_URL}/snapshot` 
+                        : (currentCamera.url || `${API_BASE_URL}/snapshot`);
+                    
+                    const secureTarget = getSecureUrl(targetUrl);
+
+                    const res = await fetch(secureTarget, {
                         headers: { 'ngrok-skip-browser-warning': 'true' },
                         cache: 'no-store'
                     });
@@ -162,6 +216,7 @@ const CameraPage = () => {
                         if (blob.size > 100) { // >100 bytes means actual JPEG data, not empty
                             const newUrl = URL.createObjectURL(blob);
                             setStreamSrc(prev => {
+                                if (streamSrcRef.current) URL.createObjectURL(blob); // Typo in old code? URL.revokeObjectURL
                                 if (streamSrcRef.current) URL.revokeObjectURL(streamSrcRef.current);
                                 streamSrcRef.current = newUrl;
                                 return newUrl;
@@ -171,7 +226,7 @@ const CameraPage = () => {
                 } catch (err) {
                     // silently retry
                 }
-            }, 500); // 2 FPS - keeps Pi load manageable
+            }, 600); // Relaxed for online use
 
             if (isAutoScanning) {
                 // Poll the backend's /latest-scan endpoint every second
@@ -579,6 +634,14 @@ const CameraPage = () => {
                     </button>
                     
                     <button
+                        onClick={runDiagnostics}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all font-bold text-xs"
+                    >
+                        <Activity className="h-4 w-4" />
+                        DIAGNOSTICS
+                    </button>
+                    
+                    <button
                         onClick={toggleAutoScan}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all ${
                             isAutoScanning
@@ -927,7 +990,7 @@ const CameraPage = () => {
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="relative h-16 w-24 overflow-hidden rounded-lg bg-black">
-                                            <img
+                                            <RemoteImage
                                                 src={camera.url}
                                                 alt={camera.name}
                                                 className={`h-full w-full object-cover ${camera.status === 'Offline' ? 'opacity-20' : 'opacity-80'}`}
@@ -1040,7 +1103,113 @@ const CameraPage = () => {
                     </motion.div>
                 </div>
             )}
+            
+            {/* Diagnostics Modal */}
+            {isDiagOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                    <GlassCard className="w-full max-w-md p-6 border-white/10 shadow-2xl overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-blue-500 animate-gradient-x" />
+                        
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                                    <Activity className="h-5 w-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-white uppercase tracking-tight">System Health</h2>
+                            </div>
+                            <button onClick={() => setIsDiagOpen(false)} className="text-slate-400 hover:text-white">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            <DiagItem label="Main API Reachability" status={diagResults.api} />
+                            <DiagItem label="Pi Snapshot Utility" status={diagResults.snapshot} />
+                            <DiagItem label="Mixed Content Security" status={diagResults.mixedContent} inverse />
+                            <DiagItem label="Ngrok Tunnel Identity" status={diagResults.ngrok} />
+                        </div>
+
+                        {diagResults.mixedContent === 'blocked' && (
+                            <div className="mt-6 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                                <p className="text-[10px] text-red-400 uppercase font-black mb-1">Security Block Detected</p>
+                                <p className="text-xs text-slate-300">Browser is blocking your local Pi because the URLs are <b>HTTP</b> while Vercel is <b>HTTPS</b>. Update your Vercel ENVs to use <b>https://</b>.</p>
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={() => setIsDiagOpen(false)}
+                            className="w-full mt-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all uppercase tracking-widest text-xs"
+                        >
+                            Dismiss
+                        </button>
+                    </GlassCard>
+                </div>
+            )}
         </motion.div>
+    );
+};
+
+const DiagItem = ({ label, status, inverse = false }: { label: string, status: string, inverse?: boolean }) => {
+    let color = "text-slate-400";
+    let icon = <Loader2 className="h-4 w-4 animate-spin" />;
+
+    if (status.includes('success') || status === 'active' || (inverse && status === 'safe')) {
+        color = "text-emerald-400";
+        icon = <CheckCircle2 className="h-4 w-4" />;
+    } else if (status === 'error' || status === 'failed' || status === 'blocked' || (inverse && status === 'blocked')) {
+        color = "text-red-400";
+        icon = <XCircle className="h-4 w-4" />;
+    }
+
+    return (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <span className="text-xs font-semibold text-slate-400">{label}</span>
+            <div className={`flex items-center gap-2 text-xs font-bold ${color}`}>
+                {status.toUpperCase()}
+                {icon}
+            </div>
+        </div>
+    );
+};
+
+// Helper component for Secure Thumbnails
+const RemoteImage = ({ src, alt, className }: { src: string, alt: string, className: string }) => {
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        
+        const fetchThumb = async () => {
+            if (!src || !src.includes('ngrok')) return;
+            try {
+                const res = await fetch(getSecureUrl(src), {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    if (isMounted) setBlobUrl(URL.createObjectURL(blob));
+                } else setError(true);
+            } catch (e) {
+                if (isMounted) setError(true);
+            }
+        };
+
+        fetchThumb();
+        return () => { 
+            isMounted = false; 
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
+        };
+    }, [src]);
+
+    if (error || !src.includes('ngrok')) return <img src={src} alt={alt} className={className} />;
+    
+    return blobUrl ? (
+        <img src={blobUrl} alt={alt} className={className} />
+    ) : (
+        <div className={`flex items-center justify-center bg-black/40 ${className}`}>
+             <Loader2 className="h-4 w-4 animate-spin text-slate-700" />
+        </div>
     );
 };
 
