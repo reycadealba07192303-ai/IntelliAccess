@@ -543,7 +543,8 @@ const CameraPage = () => {
                             // Step 4: Send to Laptop Brain (High Accuracy YOLO+EasyOCR)
                             const brainRes = await fetch(`${BRAIN_URL}/detect`, {
                                 method: 'POST',
-                                body: formData
+                                body: formData,
+                                headers: { 'ngrok-skip-browser-warning': 'true' }
                             });
                             
                             if (!brainRes.ok) throw new Error("Brain offline");
