@@ -242,8 +242,24 @@ const LogsPage = () => {
           </div>
         </div>
 
-        {/* Table Area */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] px-4 pt-0 pb-4 after:content-[''] after:block after:h-4 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {/* Table Area with Custom Scrollbar */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] px-4 pt-0 pb-4 custom-scrollbar">
+          <style>{`
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 6px;
+              height: 6px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: rgba(255, 255, 255, 0.2);
+            }
+          `}</style>
           <table className="w-full text-left text-sm text-slate-400 border-collapse">
             <thead className="sticky top-0 bg-[#0f172a]/80 backdrop-blur-md z-10 text-xs uppercase tracking-wider text-slate-400 font-bold border-b border-white/10 shadow-[0_1px_10px_0_rgba(0,0,0,0.2)]">
               <tr>
@@ -270,63 +286,85 @@ const LogsPage = () => {
 
                   return (
                     <tr key={session.id} className="group hover:bg-white/[0.03] transition-colors">
-                      <td className="px-4 py-2 min-w-[200px]">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          {session.image_url && (
-                            <div className="h-9 w-14 overflow-hidden rounded-md bg-black border border-white/10 shrink-0 relative">
-                              <img src={`${API_BASE_URL}${session.image_url}`} alt="Plate" className="h-full w-full object-cover" />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                                <Eye className="h-4 w-4 text-white" />
+                      <td className="px-4 py-4 min-w-[220px]">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-16 overflow-hidden rounded-xl bg-slate-900 border border-white/10 shrink-0 relative group/img shadow-inner flex items-center justify-center">
+                            {session.image_url ? (
+                              <>
+                                <img 
+                                  src={`${API_BASE_URL}${session.image_url}`} 
+                                  alt="Plate" 
+                                  className="h-full w-full object-cover transition-transform group-hover/img:scale-110" 
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer backdrop-blur-[1px]">
+                                  <Eye className="h-4 w-4 text-white" />
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center opacity-40">
+                                <Search className="h-4 w-4 text-slate-400 mb-0.5" />
+                                <span className="text-[8px] uppercase font-bold tracking-tighter text-slate-500">NO IMG</span>
                               </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex flex-col">
+                            <div className="font-bold text-white tracking-tight text-sm flex items-center gap-1.5">
+                              {session.plate}
                             </div>
-                          )}
-                          <div className="min-w-0 flex-1 flex flex-col justify-center">
-                            <div className="font-mono text-white font-medium text-sm truncate leading-tight">{session.plate}</div>
-                            <div className="text-[11px] text-slate-500 truncate mt-0.5 leading-tight">{ownerName}</div>
+                            <div className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{ownerName}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${role === "FACULTY" ? "bg-blue-500/10 text-blue-400" :
-                          role === "STUDENT" ? "bg-emerald-500/10 text-emerald-400" :
-                            role === "STAFF" ? "bg-orange-500/10 text-orange-400" :
-                              "bg-slate-500/10 text-slate-400"
-                          }`}>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase border ${
+                          role === "FACULTY" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                          role === "STUDENT" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                          role === "STAFF" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                          "bg-slate-400/10 text-slate-400 border-white/10 shadow-sm"
+                        }`}>
                           {displayRole}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2 text-slate-300 whitespace-nowrap text-xs">
-                          <MapPin className="h-3 w-3 shrink-0" /> {session.gate}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2 text-slate-300 font-medium whitespace-nowrap text-xs">
+                          <MapPin className="h-3.5 w-3.5 text-slate-500" /> {session.gate}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2 text-slate-300 whitespace-nowrap text-xs">
-                          <Calendar className="h-3 w-3 shrink-0" /> {session.date}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2 text-slate-400 whitespace-nowrap text-xs font-medium">
+                          {session.date}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <span className="font-medium text-emerald-400 whitespace-nowrap text-xs">
-                          {session.time_in}
-                        </span>
+                      <td className="px-4 py-4">
+                        <div className="px-2 py-1 rounded bg-emerald-500/5 inline-block">
+                          <span className="font-bold text-emerald-400 whitespace-nowrap text-xs">
+                            {session.time_in}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <span className="font-medium text-blue-400 whitespace-nowrap text-xs">
-                          {session.time_out}
-                        </span>
+                      <td className="px-4 py-4">
+                        {session.time_out !== "--" ? (
+                          <div className="px-2 py-1 rounded bg-blue-500/5 inline-block">
+                            <span className="font-bold text-blue-400 whitespace-nowrap text-xs">
+                              {session.time_out}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-600 text-xs">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] border bg-transparent whitespace-nowrap ${
-                          status === "GRANTED" ? "text-emerald-400 border-emerald-500/30" :
-                          status === "DENIED" ? "text-red-400 border-red-500/30" :
-                          "text-amber-500 border-amber-500/30"
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase border transition-all ${
+                          status === "GRANTED" ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_10px_rgba(52,211,153,0.1)]" :
+                          status === "DENIED" ? "text-red-400 border-red-500/30 bg-red-500/5 shadow-[0_0_10px_rgba(248,113,113,0.1)]" :
+                          "text-amber-500 border-amber-500/30 bg-amber-500/5"
                         }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 shadow-sm ${
                             status === "GRANTED" ? "bg-emerald-400" :
                             status === "DENIED" ? "bg-red-400" :
                             "bg-amber-500"
                           }`}></span>
-                          {status === "GRANTED" ? "Allowed" : status}
+                          {status === "GRANTED" ? "Authorized" : status}
                         </span>
                       </td>
                     </tr>
