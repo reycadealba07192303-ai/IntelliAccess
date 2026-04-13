@@ -20,12 +20,13 @@ def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user)):
         vehicle_dict = vehicle.dict(exclude_unset=True)
         vehicle_dict["status"] = "Active"
         
-        # Auto-generate RFID UID if not provided
+        # Auto-generate a realistic UHF RFID EPC UID if not provided
         if not vehicle_dict.get("rfid_tag"):
-            import random, string
-            random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            vehicle_dict["rfid_tag"] = f"AUTO-{random_id}"
-            print(f"[VEHICLES] Auto-generated RFID tag for {vehicle.plate_number}: {vehicle_dict['rfid_tag']}")
+            import secrets
+            # 96-bit EPC format: E200 + 20 hex chars (matches real UHF sticker UIDs)
+            uid = "E200" + secrets.token_hex(10).upper()
+            vehicle_dict["rfid_tag"] = uid
+            print(f"[VEHICLES] Auto-generated RFID UID for {vehicle.plate_number}: {uid}")
         
         # Assign owner_id from the authenticated user
         if user and "id" in user:
@@ -123,6 +124,14 @@ def update_vehicle(vehicle_id: str, vehicle_update: VehicleUpdate, user = Depend
         owner_id = vehicle_doc.get("owner_id") if vehicle_doc else None
         
         update_fields = vehicle_update.dict(exclude_unset=True)
+        
+        # If no RFID tag exists on the vehicle yet, auto-generate one on update too
+        if not vehicle_doc.get("rfid_tag") and "rfid_tag" not in update_fields:
+            import secrets
+            uid = "E200" + secrets.token_hex(10).upper()
+            update_fields["rfid_tag"] = uid
+            print(f"[VEHICLES] Auto-assigned RFID UID to {plate}: {uid}")
+        
         if update_fields:
             vehicles_collection.update_one(
                 {"_id": ObjectId(vehicle_id)}, 
