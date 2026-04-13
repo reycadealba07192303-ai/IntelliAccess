@@ -372,7 +372,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative z-10">
+        {/* Scrollable Content - Hidden standard scrollbar for a cleaner look */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative z-10 scrollbar-none [&::-webkit-scrollbar]:hidden">
           <div className="mx-auto max-w-6xl">
             {children}
           </div>

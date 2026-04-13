@@ -197,7 +197,7 @@ const LogsPage = () => {
         </div>
       </div>
 
-      <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
+      <GlassCard className="p-0 overflow-hidden relative shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] border border-white/5 bg-[#0a0f1e]/80 backdrop-blur-2xl flex flex-col min-h-[500px]">
         {/* Header/Filters */}
         <div className="px-6 pt-6 pb-2 bg-[#0f172a] z-10 flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
@@ -243,7 +243,7 @@ const LogsPage = () => {
         </div>
 
         {/* Table Area with Custom Scrollbar */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] px-4 pt-0 pb-4 custom-scrollbar">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] px-6 pt-0 pb-6 custom-scrollbar scroll-smooth">
           <style>{`
             .custom-scrollbar::-webkit-scrollbar {
               width: 6px;
