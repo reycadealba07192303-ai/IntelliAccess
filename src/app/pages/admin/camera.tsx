@@ -987,15 +987,18 @@ const CameraPage = () => {
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="relative h-16 w-24 overflow-hidden rounded-lg bg-black">
-                                            <RemoteImage
-                                                src={camera.url}
-                                                alt={camera.name}
-                                                className={`h-full w-full object-cover ${camera.status === 'Offline' ? 'opacity-20' : 'opacity-80'}`}
-                                            />
+                                        <div className={`relative h-16 w-24 overflow-hidden rounded-lg flex items-center justify-center transition-all border ${
+                                            selectedCamera === camera.id 
+                                            ? 'bg-blue-500/20 border-blue-500/30' 
+                                            : 'bg-slate-800/50 border-white/5'
+                                        }`}>
+                                            <Camera className={`h-8 w-8 transition-colors ${
+                                                selectedCamera === camera.id ? 'text-blue-400' : 'text-slate-500'
+                                            } ${camera.status === 'Offline' ? 'opacity-30' : 'opacity-80'}`} />
+                                            
                                             {camera.status === 'Offline' && (
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <MicOff className="h-4 w-4 text-slate-500" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                    <MicOff className="h-4 w-4 text-slate-400" />
                                                 </div>
                                             )}
                                         </div>
