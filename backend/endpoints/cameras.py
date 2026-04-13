@@ -13,6 +13,11 @@ class CameraModel(BaseModel):
 
 router = APIRouter()
 
+@router.get("/available")
+def check_camera_availability():
+    """Simple health-check endpoint for the diagnostics UI"""
+    return {"status": "success", "message": "Cameras API is reachable"}
+
 @router.get("")
 def get_all_cameras(user = Depends(get_current_user)):
     """Get all camera feeds configured in the system"""

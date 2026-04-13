@@ -215,18 +215,15 @@ const CameraPage = () => {
                         const blob = await res.blob();
                         if (blob.size > 100) { // >100 bytes means actual JPEG data, not empty
                             const newUrl = URL.createObjectURL(blob);
-                            setStreamSrc(prev => {
-                                if (streamSrcRef.current) URL.createObjectURL(blob); // Typo in old code? URL.revokeObjectURL
-                                if (streamSrcRef.current) URL.revokeObjectURL(streamSrcRef.current);
-                                streamSrcRef.current = newUrl;
-                                return newUrl;
-                            });
+                            setStreamSrc(newUrl);
+                            if (streamSrcRef.current) URL.revokeObjectURL(streamSrcRef.current);
+                            streamSrcRef.current = newUrl;
                         }
                     }
                 } catch (err) {
                     // silently retry
                 }
-            }, 600); // Relaxed for online use
+            }, 1000); // Relaxed for online use to prevent network choking
 
             if (isAutoScanning) {
                 // Poll the backend's /latest-scan endpoint every second

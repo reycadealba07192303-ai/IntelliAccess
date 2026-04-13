@@ -150,56 +150,55 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 best_conf = 0.0
                 best_boxes = []
                 
-                # Try OCR on: enhanced grayscale and thresholded (skip raw color for accuracy)
-                ocr_inputs = [enhanced, thresh]
-                ocr_labels = ["enhanced", "threshold"]
+                # Three passes for maximum accuracy:
+                # 1. Enhanced (Grayscale with better contrast)
+                # 2. Threshold (High contrast black/white)
+                # 3. Denoised (Softened edges for blurry plates)
+                ocr_inputs = [enhanced, thresh, denoised]
                 
                 for ocr_img in ocr_inputs:
                     ocr_results = reader.readtext(ocr_img, detail=1, 
                                                    allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                                                    paragraph=False,
-                                                   min_size=15,
-                                                   text_threshold=0.80,
-                                                   low_text=0.45)
+                                                   min_size=10, # Catch smaller plates
+                                                   text_threshold=0.75, # Be slightly more forgiving but verify via pattern
+                                                   low_text=0.4)
                     
                     valid_texts = []
                     total_conf = 0.0
                     for result in ocr_results:
                         bbox, text, ocr_conf = result
-                        if ocr_conf > 0.80 and len(text.strip()) >= 1:
-                            # Scale bbox back if using upscaled image
-                            if ocr_img is thresh or ocr_img is morphed:
-                                bbox = [
-                                    [pt[0] / 3, pt[1] / 3] for pt in bbox
-                                ]
+                        # Only accept letters and numbers
+                        text = re.sub(r'[^A-Z0-9]', '', text.upper())
+                        
+                        if ocr_conf > 0.65 and len(text) >= 1:
+                            # Scale bbox back to original image size
                             bx1 = int(min([pt[0] for pt in bbox]))
                             by1 = int(min([pt[1] for pt in bbox]))
                             bx2 = int(max([pt[0] for pt in bbox]))
                             by2 = int(max([pt[1] for pt in bbox]))
-                            valid_texts.append({'box': (bx1, by1, bx2, by2), 'text': text.upper(), 'conf': ocr_conf})
+                            valid_texts.append({'box': (bx1, by1, bx2, by2), 'text': text, 'conf': ocr_conf})
                             total_conf += ocr_conf
                     
                     if valid_texts:
-                        # Sort by x-coordinate (left to right)
-                        valid_texts.sort(key=lambda item: item['box'][0])
-                        
-                        # Remove duplicate consecutive characters (e.g., "77" -> "7")
                         combined_text = "".join([item['text'] for item in valid_texts])
-                        # Clean the text: remove non-alphanumeric and keep original repeating characters
-                        clean_text = re.sub(r'[^A-Z0-9]', '', combined_text).upper()
-                        found_plate = clean_text
-                        
                         avg_conf = total_conf / len(valid_texts)
                         
-                        if found_plate and avg_conf > best_conf:
-                            best_plate = found_plate
-                            best_conf = avg_conf
+                        # Apply Philippine plate pattern validation
+                        is_valid_format = any(p.match(combined_text) for p in ph_patterns)
+                        
+                        # Weight valid formats higher
+                        weighted_conf = avg_conf * (1.2 if is_valid_format else 1.0)
+                        
+                        if combined_text and weighted_conf > best_conf:
+                            best_plate = combined_text
+                            best_conf = weighted_conf
                             best_boxes = valid_texts
                 
-                # Use the best result found across all preprocessing methods
-                if best_plate and len(best_plate) >= 4:
+                # Use the best result found
+                if best_plate and len(best_plate) >= 3:
                     plate_text = best_plate
-                    confidence = round(best_conf * 100, 1)  # Convert to percentage
+                    confidence = round((best_conf / 1.2 if best_conf > 1.0 else best_conf) * 100, 1)
                     detected = True
                     
                     # Draw green bounding box on the ORIGINAL image
