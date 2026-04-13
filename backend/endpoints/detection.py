@@ -12,7 +12,7 @@ _is_arm = platform.machine().startswith('arm') or platform.machine().startswith(
 # Philippine plate patterns (standard formats)
 ph_patterns = [
     re.compile(r'^[A-Z]{3}\d{3,4}$'), # ABC1234
-    re.compile(r'^\d{4}[A-Z]{3}$'),   # 1234ABC (Motorcycles)
+    re.compile(r'^\d{3,4}[A-Z]{3}$'),   # 1234ABC or 123ABC (Motorcycles/E-bikes)
     re.compile(r'^[A-Z]{2}\d{4,5}$'), # AB12345
 ]
 
@@ -150,11 +150,11 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 best_conf = 0.0
                 best_boxes = []
                 
-                # Three passes for maximum accuracy:
-                # 1. Enhanced (Grayscale with better contrast)
-                # 2. Threshold (High contrast black/white)
+                # Three passes for maximum accuracy (Threshold first as it's the fastest and most accurate for plates):
+                # 1. Threshold (High contrast black/white)
+                # 2. Enhanced (Grayscale with better contrast)
                 # 3. Filtered (Softened edges for blurry plates)
-                ocr_inputs = [enhanced, thresh, filtered]
+                ocr_inputs = [thresh, enhanced, filtered]
                 
                 for ocr_img in ocr_inputs:
                     ocr_results = reader.readtext(ocr_img, detail=1, 
@@ -194,6 +194,13 @@ async def detect_vehicle(file: UploadFile = File(...)):
                             best_plate = combined_text
                             best_conf = weighted_conf
                             best_boxes = valid_texts
+                            
+                        # Early exit: If we confidently found a real plate format, stop searching to save 3-5 seconds!
+                        if is_valid_format and avg_conf > 0.65:
+                            break
+                    
+                    if best_plate and any(p.match(best_plate) for p in ph_patterns):
+                        break
                 
                 # Use the best result found
                 if best_plate and len(best_plate) >= 3:
