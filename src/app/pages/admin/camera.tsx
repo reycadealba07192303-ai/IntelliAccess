@@ -343,7 +343,7 @@ const CameraPage = () => {
 
         setupWebcam();
 
-        if (currentCamera.url === "local_webcam" && isAutoScanning) {
+        if (currentCamera.url === "local_webcam" && isAutoScanning && !isBrainMode) {
             captureInterval = setInterval(async () => {
                 if (scanningRef.current || !videoRef.current || !canvasRef.current) return;
                 

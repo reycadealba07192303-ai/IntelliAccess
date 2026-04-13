@@ -153,8 +153,8 @@ async def detect_vehicle(file: UploadFile = File(...)):
                 # Three passes for maximum accuracy:
                 # 1. Enhanced (Grayscale with better contrast)
                 # 2. Threshold (High contrast black/white)
-                # 3. Denoised (Softened edges for blurry plates)
-                ocr_inputs = [enhanced, thresh, denoised]
+                # 3. Filtered (Softened edges for blurry plates)
+                ocr_inputs = [enhanced, thresh, filtered]
                 
                 for ocr_img in ocr_inputs:
                     ocr_results = reader.readtext(ocr_img, detail=1, 
@@ -433,13 +433,14 @@ async def detect_vehicle(file: UploadFile = File(...)):
                             type="alert"
                         )
                         
-                        send_access_sms(
-                            phone_number=owner_phone,
-                            owner_name=owner_name,
-                            plate_number=plate_text,
-                            time_str=current_time_str,
-                            action=action
-                        )
+                        import threading
+                        threading.Thread(target=send_access_sms, kwargs={
+                            "phone_number": owner_phone,
+                            "owner_name": owner_name,
+                            "plate_number": plate_text,
+                            "time_str": current_time_str,
+                            "action": action
+                        }).start()
                     except Exception as sms_e:
                         print(f"SMS Error: {sms_e}")
                     
