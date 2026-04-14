@@ -101,11 +101,7 @@ const VehiclesPage = () => {
     }
   };
 
-  const handleGenerateUID = () => {
-    const randomUID = "AUTO-" + Math.random().toString(36).substr(2, 9).toUpperCase();
-    setFormData(prev => ({ ...prev, rfid_tag: randomUID }));
-    showNotification("Generated Random UID for Vehicle", "info");
-  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,14 +435,7 @@ const VehiclesPage = () => {
                     {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Disc className="h-4 w-4" />}
                     {isScanning ? "Scanning..." : "Scan"}
                   </GlassButton>
-                  <GlassButton 
-                    type="button"
-                    onClick={handleGenerateUID}
-                    className="flex items-center gap-2 px-4 bg-slate-700 hover:bg-slate-600 text-white border-none"
-                    title="Generate Random UID"
-                  >
-                    Auto-Gen
-                  </GlassButton>
+
                 </div>
                 <p className="text-[10px] text-slate-500 italic">Tap the RFID sticker on the reader to auto-fill this field.</p>
               </div>
