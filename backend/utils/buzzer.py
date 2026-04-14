@@ -1,13 +1,13 @@
 """
 Buzzer control utility for Raspberry Pi GPIO.
-Connects to a buzzer on GPIO pin 18 (BCM) by default.
+Connects to a buzzer on GPIO pin 17 (BCM) by default.
 Gracefully falls back (no crash) if running on a non-Pi system.
 """
 import threading
 import time
 
 # Buzzer GPIO pin (BCM numbering) - change this to match your wiring
-BUZZER_PIN = 18
+BUZZER_PIN = 17
 
 _gpio_available = False
 try:
