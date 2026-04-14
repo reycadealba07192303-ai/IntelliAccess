@@ -147,6 +147,17 @@ const SignInPage = () => {
                 <>Sign In <ArrowRight className="h-4 w-4" /></>
               )}
             </GlassButton>
+
+            <GlassButton 
+              type="button" 
+              className="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30"
+              onClick={() => {
+                localStorage.setItem("access_token", "demo-admin-token");
+                navigate("/admin");
+              }}
+            >
+              Demo Admin Bypass
+            </GlassButton>
           </form>
 
           {/* Google SSO Removed as requested */}

@@ -18,6 +18,7 @@ export default defineConfig({
   },
 
   server: {
+    allowedHosts: true,
     watch: {
       // Do not watch the Python virtual environment or other large backend folders.
       ignored: ['**/backend/venv/**', '**/node_modules/**', '**/.git/**'],

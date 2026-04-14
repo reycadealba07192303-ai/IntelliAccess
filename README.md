@@ -14,5 +14,25 @@ Strict Security Enforcement: Unauthorized vehicles, spoofed plates, or unregiste
 Technical Architecture
 IntelliAccess is engineered on a highly scalable, modern tech stack. The user interface is built with React, TypeScript, and Tailwind CSS, featuring a premium glassmorphism design system.
 
-The core engine is powered by a high-performance Python FastAPI backend, utilizing OpenCV and YOLO for live video streaming and AI frame analysis. All sensitive data is encrypted and housed in a MongoDB database, while real-time camera feeds and system alerts are transmitted via bidirectional WebSockets.
-  
+The core engine is powered by a high-performance Python FastAPI backend, utilizing OpenCV and YOLO for live video streaming and AI frame analysis. All sensitive data is safely stored in a **Zero-Setup Local JSON Database** (`backend/local_db`), eliminating the need for an external MongoDB server. Real-time camera feeds and system alerts are transmitted via bidirectional WebSockets.
+
+## How to Run Locally
+
+You can run the entire system gracefully in two terminal windows without any complicated environment setups:
+
+### 1. Run the Frontend (Web Dashboard)
+Open a terminal in the main root folder and run:
+```bash
+pnpm install
+pnpm run dev
+```
+
+### 2. Run the AI Brain Server (Backend)
+Open a separate terminal, install the python dependencies, and start the brain server:
+```bash
+cd backend
+pip install -r requirements.txt
+python brain_server.py
+```
+
+*Note: There is absolutely no external database required! The system proactively generates its own storage securely inside `backend/local_db` on first launch.*

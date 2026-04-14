@@ -1,0 +1,32 @@
+[
+  {
+    "plate_detected": "LPCAME",
+    "action": "Entry",
+    "status": "GRANTED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:48:38.733570",
+    "image_url": "/static/captures/capture_1776194318.jpg",
+    "vehicle_id": "demo_guest",
+    "_id": "8c32ebc2725a4b9b83a8bc70b13a36e7"
+  },
+  {
+    "plate_detected": "LPCAME",
+    "action": "Exit",
+    "status": "GRANTED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:50:17.586082",
+    "image_url": "/static/captures/capture_1776194417.jpg",
+    "vehicle_id": "demo_guest",
+    "_id": "29aa600ee62b4cb6981df207b5122314"
+  },
+  {
+    "plate_detected": "LPCAME",
+    "action": "Entry",
+    "status": "GRANTED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:52:52.546954",
+    "image_url": "/static/captures/capture_1776194572.jpg",
+    "vehicle_id": "demo_guest",
+    "_id": "35e6632d87764608b8b0673082465b69"
+  }
+]
