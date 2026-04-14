@@ -22,8 +22,8 @@ def create_vehicle(vehicle: VehicleCreate, user = Depends(get_current_user)):
         
 
         
-        # Assign owner_id from the authenticated user
-        if user and "id" in user:
+        # Assign owner_id from the request, fallback to authenticated user if missing
+        if not vehicle_dict.get("owner_id") and user and "id" in user:
             vehicle_dict["owner_id"] = user["id"]
             
         result = vehicles_collection.insert_one(vehicle_dict)
