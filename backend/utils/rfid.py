@@ -84,13 +84,16 @@ class RFIDReader:
 
             if self.serial.in_waiting > 0:
                 raw = self.serial.read(self.serial.in_waiting)
-                # M5Stack UHF response frame: BB 02 22 00 <len> <rssi> <epc_bytes...> <crc> 7E
-                # Minimum valid response is 10 bytes
-                if len(raw) >= 10 and raw[0] == 0xBB and raw[-1] == 0x7E:
-                    # EPC starts at byte 7, ends 2 bytes before end (skip CRC + 0x7E)
-                    epc_bytes = raw[7:-2]
-                    if epc_bytes:
-                        return epc_bytes.hex().upper()
+                # Split by 0x7E to handle multiple concatenated frames in the buffer
+                frames = raw.split(b'\x7E')
+                for frame in frames:
+                    # Minimum valid response is 9 bytes before the 0x7E
+                    if len(frame) >= 9 and frame[0] == 0xBB:
+                        # EPC starts at byte 7, ends 2 bytes before the end (which are CRC)
+                        epc_bytes = frame[7:-2]
+                        if epc_bytes:
+                            return epc_bytes.hex().upper()
+                
                 # Fallback: try to decode as plain text (for other reader modes)
                 try:
                     decoded = raw.decode('utf-8', errors='ignore').strip()
@@ -188,7 +191,7 @@ def _process_rfid_tag(tag_id: str):
                     print(f"[RFID] Failed to lookup owner: {ex}")
                     
             # Check Vehicle-ID based cooldown
-            vehicle_id = str(vehicle["_id"])
+            vehicle_id = vehicle["id"] # Use the string ID we already created
             if is_on_cooldown(vehicle_id):
                 print(f"[RFID] Ignoring {tag_id} - recently logged via ID {vehicle_id}")
                 return
@@ -227,7 +230,7 @@ def _process_rfid_tag(tag_id: str):
         log_entry_id = None
         current_time_str = datetime.now().strftime("%I:%M %p")
         log_data = {
-            "plate_detected": vehicle_info.get("plate_number", tag_id) if vehicle_info else tag_id,
+            "plate_detected": vehicle_info.get("plate_number", "Unregistered RFID") if vehicle_info else "Unregistered RFID",
             "rfid_tag": tag_id,
             "action": action,
             "status": "GRANTED" if status == "Authorized" else "DENIED",

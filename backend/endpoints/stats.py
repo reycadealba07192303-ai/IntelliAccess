@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from endpoints.auth import get_current_user
-from mongo_client import users_collection, vehicles_collection, access_logs_collection
+from mongo_client import users_collection, vehicles_collection, access_logs_collection, denied_logs_collection
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
@@ -34,9 +34,8 @@ def get_admin_stats(user = Depends(get_current_user)):
         })
         
         # 4. Unauthorized Attempts today
-        unauthorized_attempts = access_logs_collection.count_documents({
-            "timestamp": {"$gte": start_today_str},
-            "status": "DENIED"
+        unauthorized_attempts = denied_logs_collection.count_documents({
+            "timestamp": {"$gte": start_today_str}
         })
 
         # Calculate a simple 24hr distribution based on today's logs (using local time blocks)

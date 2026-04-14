@@ -37,15 +37,15 @@ def _buzz(duration: float, times: int = 1, gap: float = 0.1):
 
 
 def buzz_granted():
-    """Two short beeps = ACCESS GRANTED."""
-    print("[BUZZER] Triggered: ACCESS GRANTED (2 short beeps)")
-    threading.Thread(target=_buzz, args=(0.15, 2, 0.1), daemon=True).start()
+    """Single beep for 2 seconds = ACCESS GRANTED."""
+    print("[BUZZER] Triggered: ACCESS GRANTED (2s beep)")
+    threading.Thread(target=_buzz, args=(2.0, 1), daemon=True).start()
 
 
 def buzz_denied():
-    """One long beep = ACCESS DENIED."""
-    print("[BUZZER] Triggered: ACCESS DENIED (1 long beep)")
-    threading.Thread(target=_buzz, args=(0.8, 1), daemon=True).start()
+    """Single continuous beep for 5 seconds = ACCESS DENIED."""
+    print("[BUZZER] Triggered: ACCESS DENIED (5s beep)")
+    threading.Thread(target=_buzz, args=(5.0, 1), daemon=True).start()
 
 
 def buzz_once(duration: float = 0.2):
