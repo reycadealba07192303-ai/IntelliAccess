@@ -33,6 +33,8 @@ const VehiclesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Partial<Vehicle> | null>(null);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
   const [formData, setFormData] = useState({
     plate_number: "",
     model: "",
@@ -80,6 +82,8 @@ const VehiclesPage = () => {
         rfid_tag: vehicle.rfid_tag || "",
         owner_id: vehicle.owner_id
       });
+      const owner = users.find(u => u.id === vehicle.owner_id);
+      setOwnerSearch(owner ? (owner.name || owner.email) : "");
     } else {
       setEditingVehicle(null);
       setFormData({
@@ -90,7 +94,9 @@ const VehiclesPage = () => {
         rfid_tag: "",
         owner_id: ""
       });
+      setOwnerSearch("");
     }
+    setShowOwnerDropdown(false);
     setIsModalOpen(true);
   };
 
@@ -426,16 +432,56 @@ const VehiclesPage = () => {
 
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Owner / User Account</label>
-                <select
-                  value={formData.owner_id || ""}
-                  onChange={(e) => setFormData({...formData, owner_id: e.target.value})}
-                  className="w-full rounded-lg border border-white/10 bg-[#1e293b] py-2 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">-- No specific owner (Guest/System) --</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name || u.email} ({u.role})</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Type to search user..."
+                    value={ownerSearch}
+                    onChange={(e) => {
+                      setOwnerSearch(e.target.value);
+                      setFormData({...formData, owner_id: ""});
+                      setShowOwnerDropdown(true);
+                    }}
+                    onFocus={() => setShowOwnerDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowOwnerDropdown(false), 150)}
+                    className="w-full rounded-lg border border-white/10 bg-white/5 py-2 px-3 text-sm text-white placeholder-slate-500 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {showOwnerDropdown && (
+                    <div className="absolute z-20 mt-1 w-full rounded-lg border border-white/10 bg-[#1e293b] shadow-xl max-h-48 overflow-y-auto">
+                      <div
+                        className="px-3 py-2 text-sm text-slate-400 hover:bg-white/10 cursor-pointer"
+                        onMouseDown={() => { setOwnerSearch(""); setFormData({...formData, owner_id: ""}); setShowOwnerDropdown(false); }}
+                      >
+                        -- No specific owner --
+                      </div>
+                      {users
+                        .filter(u => {
+                          const q = ownerSearch.toLowerCase();
+                          return !q || (u.name||u.email||"").toLowerCase().includes(q) || (u.role||"").toLowerCase().includes(q);
+                        })
+                        .map(u => (
+                          <div
+                            key={u.id}
+                            onMouseDown={() => {
+                              setOwnerSearch(u.name || u.email);
+                              setFormData({...formData, owner_id: u.id});
+                              setShowOwnerDropdown(false);
+                            }}
+                            className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/10 flex items-center justify-between ${
+                              formData.owner_id === u.id ? 'text-blue-400 bg-blue-500/10' : 'text-white'
+                            }`}
+                          >
+                            <span>{u.name || u.email}</span>
+                            <span className="text-xs text-slate-500">{u.role}</span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
+                {formData.owner_id && (
+                  <p className="text-[10px] text-emerald-400">✓ Owner selected: {ownerSearch}</p>
+                )}
               </div>
 
               <div className="space-y-2">
