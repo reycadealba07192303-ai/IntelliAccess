@@ -122,9 +122,9 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                     </button>
                 </div>
 
-                <GlassCard className="p-0 overflow-hidden relative shadow-2xl rounded-2xl border border-white/10 bg-[#0f172a] flex flex-col">
-                    {/* Header/Filters */}
-                    <div className="p-6 bg-[#0f172a] z-10 flex flex-col gap-4 lg:flex-row lg:items-center">
+                <GlassCard className="p-0 overflow-hidden relative shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] border border-white/5 bg-[#0a0f1e]/80 backdrop-blur-2xl flex flex-col min-h-[500px]">
+                    {/* Header/Filters (Floating Island Design) */}
+                    <div className="mx-6 mt-6 mb-6 p-4 bg-white/[0.02] rounded-2xl z-10 flex flex-col gap-4 lg:flex-row lg:items-center border border-white/5 shadow-sm">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                             <input
@@ -132,7 +132,7 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                                 placeholder="Search by plate or gate..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-200 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                                className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-10 pr-4 text-sm text-slate-200 transition-all focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                             />
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -142,32 +142,48 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                                     type="date"
                                     value={dateFilter}
                                     onChange={(e) => setDateFilter(e.target.value)}
-                                    className="rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-slate-300 outline-none focus:bg-white/10"
+                                    className="rounded-xl border border-white/10 bg-white/5 py-2.5 pl-10 pr-4 text-sm text-slate-300 outline-none transition-all focus:bg-white/10 focus:ring-1 focus:ring-blue-500/40"
                                 />
                             </div>
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 outline-none focus:bg-white/10"
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 outline-none transition-all focus:bg-white/10 focus:ring-1 focus:ring-blue-500/40 appearance-none min-w-[120px]"
                             >
-                                <option>All Status</option>
-                                <option>Authorized</option>
-                                <option>Denied</option>
+                                <option className="bg-slate-900">All Status</option>
+                                <option className="bg-slate-900">Authorized</option>
+                                <option className="bg-slate-900">Denied</option>
                             </select>
                         </div>
                     </div>
 
                     {/* Table Area */}
-                    <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pt-6 pb-6 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] px-6 pt-2 pb-6 custom-scrollbar scroll-smooth">
+                        <style>{`
+                            .custom-scrollbar::-webkit-scrollbar {
+                              width: 6px;
+                              height: 6px;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-track {
+                              background: transparent;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-thumb {
+                              background: rgba(255, 255, 255, 0.1);
+                              border-radius: 10px;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                              background: rgba(255, 255, 255, 0.2);
+                            }
+                        `}</style>
                         <table className="w-full text-left text-sm text-slate-400 border-collapse">
-                            <thead className="sticky top-0 bg-[#0f172a] z-10 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-white/5 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
+                            <thead className="sticky top-0 bg-[#0a0f1e]/80 backdrop-blur-xl z-20 text-[10px] uppercase font-bold tracking-widest text-slate-500 border-b border-white/5 shadow-sm">
                                 <tr>
-                                    <th className="px-6 py-4 font-medium">Vehicle</th>
-                                    <th className="px-6 py-4 font-medium">Location</th>
-                                    <th className="px-6 py-4 font-medium">Date</th>
-                                    <th className="px-6 py-4 font-medium">Time In</th>
-                                    <th className="px-6 py-4 font-medium">Time Out</th>
-                                    <th className="px-6 py-4 font-medium">Status</th>
+                                    <th className="px-4 py-4 font-bold min-w-[220px]">Vehicle Details</th>
+                                    <th className="px-4 py-4 font-bold">Gate Point</th>
+                                    <th className="px-4 py-4 font-bold">Date</th>
+                                    <th className="px-4 py-4 font-bold">Time In</th>
+                                    <th className="px-4 py-4 font-bold">Time Out</th>
+                                    <th className="px-4 py-4 font-bold">Access Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
@@ -180,54 +196,78 @@ const UserLogsPage: React.FC<UserLogsPageProps> = ({ userType = "user" }) => {
                                         const status = session.status;
                                         return (
                                             <tr key={session.id} className="group hover:bg-white/[0.03] transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        {session.image_url && (
-                                                            <div className="h-10 w-16 overflow-hidden rounded-md bg-black border border-white/10 shrink-0 relative group/img">
-                                                                <img src={`${API_BASE_URL}${session.image_url}`} alt="Plate" className="h-full w-full object-cover" />
-                                                                <div
-                                                                    className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
-                                                                    onClick={() => setSelectedImage(`${API_BASE_URL}${session.image_url}`)}
-                                                                >
-                                                                    <Eye className="h-4 w-4 text-white" />
+                                                <td className="px-4 py-4 min-w-[220px]">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="h-10 w-16 overflow-hidden rounded-xl bg-slate-900 border border-white/10 shrink-0 relative group/img shadow-inner flex items-center justify-center">
+                                                            {session.image_url ? (
+                                                                <>
+                                                                    <img 
+                                                                        src={`${API_BASE_URL}${session.image_url}`} 
+                                                                        alt="Plate" 
+                                                                        className="h-full w-full object-cover transition-transform group-hover/img:scale-110" 
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                                        }}
+                                                                    />
+                                                                    <div
+                                                                        className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all cursor-pointer backdrop-blur-[1px]"
+                                                                        onClick={() => setSelectedImage(`${API_BASE_URL}${session.image_url}`)}
+                                                                    >
+                                                                        <Eye className="h-4 w-4 text-white" />
+                                                                    </div>
+                                                                    {/* Native Fallback if image fails to load */}
+                                                                    <div className="hidden absolute inset-0 flex-col items-center justify-center opacity-40 bg-slate-900 pointer-events-none">
+                                                                        <Search className="h-4 w-4 text-slate-400 mb-0.5" />
+                                                                        <span className="text-[8px] uppercase font-bold tracking-tighter text-slate-500">NO IMG</span>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <div className="flex flex-col items-center justify-center opacity-40">
+                                                                    <Search className="h-4 w-4 text-slate-400 mb-0.5" />
+                                                                    <span className="text-[8px] uppercase font-bold tracking-tighter text-slate-500">NO IMG</span>
                                                                 </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0 flex flex-col">
+                                                            <div className="font-bold text-white tracking-tight text-sm flex items-center gap-1.5">
+                                                                {session.plate}
                                                             </div>
-                                                        )}
-                                                        <div className="font-mono text-white font-medium">{session.plate}</div>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-4">
                                                     <div className="flex items-center gap-2 text-slate-300">
                                                         <MapPin className="h-3 w-3" /> {session.gate}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-4">
                                                     <div className="flex items-center gap-2 text-slate-300">
                                                         <Calendar className="h-3 w-3" /> {session.date}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-medium text-emerald-400">
+                                                <td className="px-4 py-4">
+                                                    <span className="inline-flex items-center justify-center bg-emerald-500/5 text-emerald-400 border border-emerald-500/10 rounded-md px-2.5 py-1 text-[11px] font-bold tracking-wider">
                                                         {session.time_in}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-medium text-blue-400">
+                                                <td className="px-4 py-4">
+                                                    <span className="inline-flex items-center justify-center bg-blue-500/5 text-blue-400 border border-blue-500/10 rounded-md px-2.5 py-1 text-[11px] font-bold tracking-wider">
                                                         {session.time_out}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs border bg-transparent ${
-                                                        status === "GRANTED" ? "text-emerald-400 border-emerald-500/30" :
-                                                        status === "DENIED" ? "text-red-400 border-red-500/30" :
-                                                        "text-amber-500 border-amber-500/30"
+                                                <td className="px-4 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase border border-white/10 shadow-sm ${
+                                                        status === "GRANTED" ? "text-emerald-400 bg-emerald-500/10 shadow-emerald-500/5" :
+                                                        status === "DENIED" ? "text-rose-400 bg-rose-500/10 shadow-rose-500/5" :
+                                                        "text-amber-500 bg-amber-500/10 shadow-amber-500/5"
                                                     }`}>
-                                                        <span className={`h-1.5 w-1.5 rounded-full ${
+                                                        <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
                                                             status === "GRANTED" ? "bg-emerald-400" :
-                                                            status === "DENIED" ? "bg-red-400" :
+                                                            status === "DENIED" ? "bg-rose-400" :
                                                             "bg-amber-500"
                                                         }`}></span>
-                                                        {status === "GRANTED" ? "Allowed" : status}
+                                                        {status === "GRANTED" ? "AUTHORIZED" : status}
                                                     </span>
                                                 </td>
                                             </tr>
