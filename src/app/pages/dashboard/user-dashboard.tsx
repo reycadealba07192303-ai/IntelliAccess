@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Plus, Car, MapPin, Clock, Trash2, Edit2, Save, AlertTriangle } from "lucide-react";
+import { Car, MapPin, Clock, Trash2, Edit2, Save, AlertTriangle } from "lucide-react";
 import DashboardLayout from "../../components/layout/dashboard-layout";
-import { GlassCard, GlassButton } from "../../components/ui/glass-components";
+import { GlassCard } from "../../components/ui/glass-components";
 import { useNotification } from "../../context/NotificationContext";
 
 import { apiFetch } from "../../../lib/api";
@@ -52,13 +52,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
     fetchVehicles();
     fetchLogs();
   }, []);
-  // State for Vehicle Registration
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({
-    plate: "",
-    model: ""
-  });
-
   // State for Vehicle Details/CRUD
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
@@ -66,29 +59,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
 
   // State for Delete Confirmation
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-
-  // Handlers
-
-
-  const handleRegister = async () => {
-    try {
-      await apiFetch("/vehicles/", {
-        method: "POST",
-        body: JSON.stringify({
-          plate_number: newVehicle.plate,
-          model: newVehicle.model,
-        }),
-      });
-      setIsRegisterModalOpen(false);
-      setNewVehicle({ plate: "", model: "" });
-      showNotification("Vehicle registered successfully", "success");
-      fetchVehicles();
-      fetchLogs();
-    } catch (error) {
-      console.error(error);
-      showNotification("Failed to register vehicle", "error");
-    }
-  };
 
   const handleVehicleClick = (vehicle: any) => {
     setSelectedVehicle(vehicle);
@@ -151,7 +121,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {myVehicles.length === 0 ? (
             <div className="col-span-full py-8 text-center text-slate-500">
-              No vehicles registered yet. Click "Add New Vehicle" to get started.
+              No vehicles registered yet. Please contact the admin to register your vehicle.
             </div>
           ) : (
             myVehicles.map((vehicle, index) => (
