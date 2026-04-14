@@ -353,32 +353,7 @@ const AccountsPage = () => {
           })
         });
 
-        // 2. Handle Vehicle Persistence (RFID, Plate, Model)
-        if (formData.vehiclePlate) {
-          const vehicleData = {
-            plate_number: formData.vehiclePlate,
-            model: formData.vehicleModel || "Unknown",
-            rfid_tag: formData.vehicleRfid || "",
-            owner_id: editingUser.id
-          };
-
-          if (editingUser.vehicles && editingUser.vehicles.length > 0) {
-            // Update existing vehicle
-            const vId = editingUser.vehicles[0].id || editingUser.vehicles[0]._id;
-            await apiFetch(`/vehicles/${vId}`, {
-              method: 'PUT',
-              body: JSON.stringify(vehicleData)
-            });
-          } else {
-            // Create new vehicle
-            await apiFetch(`/vehicles`, {
-              method: 'POST',
-              body: JSON.stringify(vehicleData)
-            });
-          }
-        }
-
-        showNotification("User and vehicle updated successfully", "success");
+        showNotification("User updated successfully", "success");
       } else {
         // Create User - This is tricky client-side without Admin API 
         // usually enables 'Sign Up' instead. 
@@ -922,7 +897,7 @@ const AccountsPage = () => {
 
                   {editingUser && (
                     <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400">
-                      Note: <span className="text-slate-200 font-semibold">Email</span> and <span className="text-slate-200 font-semibold">Plate Number</span> are locked and can’t be updated.
+                      Note: <span className="text-slate-200 font-semibold">Email</span> address is locked and can’t be updated.
                     </div>
                   )}
 
@@ -967,66 +942,8 @@ const AccountsPage = () => {
                     </div>
                   </div>
 
-                  <div className="border-t border-white/10 pt-4 mt-2">
-                    <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                      <Car className="h-4 w-4" /> Vehicle Information
-                    </h4>
-                    <div className="grid grid-cols-3 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          Vehicle Plate
-                        </label>
-                        <GlassInput
-                          placeholder="e.g. ABC 1234"
-                          value={formData.vehiclePlate}
-                          onChange={(e) => setFormData({ ...formData, vehiclePlate: e.target.value.toUpperCase() })}
-                          disabled={!!editingUser}
-                          className={editingUser ? "opacity-50 cursor-not-allowed bg-white/5 border-transparent text-slate-400" : ""}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          Vehicle Model
-                        </label>
-                        <GlassInput
-                          placeholder="e.g. Toyota Vios"
-                          value={formData.vehicleModel}
-                          onChange={(e) => setFormData({ ...formData, vehicleModel: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          RFID Tag (UHF)
-                        </label>
-                        <div className="flex gap-2">
-                          <GlassInput
-                            placeholder="Scan sticker..."
-                            value={formData.vehicleRfid}
-                            onChange={(e) => setFormData({ ...formData, vehicleRfid: e.target.value })}
-                          />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              toast.loading("Reading RFID...", { id: "rfid-read" });
-                              try {
-                                const res = await apiFetch("/rfid/read", { method: "POST" });
-                                if (res.status === "success") {
-                                  setFormData({ ...formData, vehicleRfid: res.tag_id });
-                                  toast.success("RFID Tag Captured!", { id: "rfid-read" });
-                                } else {
-                                  toast.error(res.message || "No tag found", { id: "rfid-read" });
-                                }
-                              } catch (err) {
-                                toast.error("Failed to read RFID", { id: "rfid-read" });
-                              }
-                            }}
-                            className="rounded-lg bg-blue-600/20 px-3 py-2 text-xs font-bold text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-all"
-                          >
-                            SCAN
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="pt-2">
+                    {/* Vehicle section removed as per user request */}
                   </div>
 
                   <div className="mt-6 flex justify-end gap-3">
