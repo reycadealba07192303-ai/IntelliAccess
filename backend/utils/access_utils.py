@@ -30,17 +30,21 @@ def set_cooldown(identifier: str):
         access_cooldowns[identifier] = time.time()
 
 def trigger_hardware_success():
-    """Trigger the buzzer/relay for authorized access."""
+    """Trigger the buzzer and Green LED for authorized access."""
     try:
-        from endpoints.stream import buzz_granted
+        from utils.buzzer import buzz_granted
+        from utils.led_utils import led_granted
         buzz_granted()
+        led_granted()
     except Exception as e:
-        print(f"[HARDWARE] Error triggering success buzz: {e}")
+        print(f"[HARDWARE] Error triggering success hardware: {e}")
 
 def trigger_hardware_denied():
-    """Trigger the buzzer for denied access."""
+    """Trigger the buzzer and Blue LED for denied access."""
     try:
-        from endpoints.stream import buzz_denied
+        from utils.buzzer import buzz_denied
+        from utils.led_utils import led_denied
         buzz_denied()
+        led_denied()
     except Exception as e:
-        print(f"[HARDWARE] Error triggering denied buzz: {e}")
+        print(f"[HARDWARE] Error triggering denied hardware: {e}")
