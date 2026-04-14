@@ -191,7 +191,7 @@ def _process_rfid_tag(tag_id: str):
                     print(f"[RFID] Failed to lookup owner: {ex}")
                     
             # Check Vehicle-ID based cooldown
-            vehicle_id = str(vehicle["_id"])
+            vehicle_id = vehicle["id"] # Use the string ID we already created
             if is_on_cooldown(vehicle_id):
                 print(f"[RFID] Ignoring {tag_id} - recently logged via ID {vehicle_id}")
                 return
