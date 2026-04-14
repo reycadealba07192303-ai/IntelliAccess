@@ -24,6 +24,7 @@ interface Vehicle {
 const VehiclesPage = () => {
   const { showNotification } = useNotification();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<VehicleStatus | "All">("All");
@@ -54,8 +55,18 @@ const VehiclesPage = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const data = await apiFetch('/auth/users');
+      setUsers(data as any);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
   useEffect(() => {
     fetchVehicles();
+    fetchUsers();
   }, []);
 
   const handleOpenModal = (vehicle: Vehicle | null = null) => {
@@ -411,6 +422,20 @@ const VehiclesPage = () => {
                     <option value="Truck">Truck</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Owner / User Account</label>
+                <select
+                  value={formData.owner_id || ""}
+                  onChange={(e) => setFormData({...formData, owner_id: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-[#1e293b] py-2 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">-- No specific owner (Guest/System) --</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.email} ({u.role})</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

@@ -144,9 +144,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
             <h1 className="text-2xl font-bold text-white">My Vehicles</h1>
             <p className="text-slate-400">Manage your registered vehicles and view access history.</p>
           </div>
-          <GlassButton className="hidden sm:flex" onClick={() => setIsRegisterModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Register Vehicle
-          </GlassButton>
+
         </div>
 
         {/* Vehicles Grid */}
@@ -186,16 +184,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
             ))
           )}
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="flex h-full min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-slate-400 transition-colors hover:border-blue-500/50 hover:bg-white/10 hover:text-blue-400"
-          >
-            <Plus className="mb-2 h-8 w-8" />
-            <span className="font-medium">Add New Vehicle</span>
-          </motion.div>
+
         </div>
 
         {/* Recent Logs Section */}
@@ -234,54 +223,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
           </GlassCard>
         </div>
 
-        {/* Register Vehicle Modal */}
-        {isRegisterModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-md"
-            >
-              <GlassCard className="relative">
-                <button
-                  onClick={() => setIsRegisterModalOpen(false)}
-                  className="absolute top-4 right-4 text-slate-400 hover:text-white"
-                >
-                  <Plus className="h-5 w-5 rotate-45" />
-                </button>
 
-                <h2 className="text-2xl font-bold text-white mb-6">Register New Vehicle</h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Plate Number</label>
-                    <input
-                      type="text"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="ABC 1234"
-                      value={newVehicle.plate}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, plate: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Vehicle Model</label>
-                    <input
-                      type="text"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Toyota Vios 2023"
-                      value={newVehicle.model}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, model: e.target.value })}
-                    />
-                  </div>
-                  <GlassButton className="w-full mt-2" onClick={handleRegister}>
-                    Submit Registration
-                  </GlassButton>
-                </div>
-              </GlassCard>
-            </motion.div>
-          </div>
-        )}
 
         {/* Vehicle Details Modal */}
         {isDetailsModalOpen && selectedVehicle && (
