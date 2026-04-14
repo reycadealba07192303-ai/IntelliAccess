@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Car, MapPin, Clock, Trash2, Edit2, Save, AlertTriangle } from "lucide-react";
+import { Car, MapPin, Clock, Trash2, Edit2, Save, AlertTriangle, X } from "lucide-react";
 import DashboardLayout from "../../components/layout/dashboard-layout";
-import { GlassCard } from "../../components/ui/glass-components";
+import { GlassCard, GlassButton } from "../../components/ui/glass-components";
 import { useNotification } from "../../context/NotificationContext";
 
 import { apiFetch } from "../../../lib/api";
@@ -208,7 +208,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ userType = "user" }) => {
                   onClick={() => setIsDetailsModalOpen(false)}
                   className="absolute top-4 right-4 text-slate-400 hover:text-white"
                 >
-                  <Plus className="h-5 w-5 rotate-45" />
+                  <X className="h-5 w-5" />
                 </button>
 
                 <div className="mb-6 flex items-center justify-between">
