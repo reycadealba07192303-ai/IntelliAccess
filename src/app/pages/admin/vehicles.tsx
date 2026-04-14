@@ -287,9 +287,16 @@ const VehiclesPage = () => {
                             {v.plate_number}
                           </span>
                           {v.rfid_tag && (
-                            <span className="text-[10px] text-blue-400 flex items-center gap-1">
-                              <Tag className="h-3 w-3" />
-                              {v.rfid_tag}
+                            <span 
+                              className="text-[10px] text-blue-400 flex items-center gap-1"
+                              title={v.rfid_tag}
+                            >
+                              <Tag className="h-3 w-3 shrink-0" />
+                              <span className="truncate">
+                                {v.rfid_tag.length > 16 
+                                  ? `${v.rfid_tag.slice(0, 8)}...${v.rfid_tag.slice(-8)}` 
+                                  : v.rfid_tag}
+                              </span>
                             </span>
                           )}
                         </div>

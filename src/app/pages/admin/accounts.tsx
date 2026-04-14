@@ -779,8 +779,12 @@ const AccountsPage = () => {
                                     <span className="text-slate-200 font-medium">{v.model}</span>
                                   </div>
                                   <div className="flex justify-between gap-4">
-                                    <span className="text-slate-500">RFID Tag</span>
-                                    <span className="text-slate-200 font-medium">{v.rfid_tag || "—"}</span>
+                                    <span className="text-slate-500 whitespace-nowrap">RFID Tag</span>
+                                    <span className="text-slate-200 font-medium text-right truncate" title={v.rfid_tag}>
+                                      {v.rfid_tag 
+                                        ? (v.rfid_tag.length > 16 ? `${v.rfid_tag.slice(0, 8)}...${v.rfid_tag.slice(-8)}` : v.rfid_tag) 
+                                        : "—"}
+                                    </span>
                                   </div>
                                 </div>
                               ))}
