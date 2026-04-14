@@ -28,31 +28,41 @@ def get_latest_rfid_scan():
 
 @router.post("/read")
 def read_rfid_tag():
-    """Manual read trigger for RFID tag (used for registration/testing)"""
-    reader = get_rfid_reader()
+    """Manual read trigger for RFID tag (used for registration/testing).
+    Uses the background polling thread's shared state to avoid serial port conflicts.
+    """
+    import utils.rfid as rfid_module
 
-    # If it's already polling in background, we shouldn't open serial again
-    # But for registration, we might want a clean read. 
-    # Let's try to use the current connection if available.
-    
+    # If background polling is active, wait for it to detect a NEW tag
+    if rfid_module.rfid_polling_active:
+        # Capture current tag to detect when a NEW one is scanned
+        current = rfid_module.latest_rfid_scan
+        old_tag = current.get("rfid_tag") if current else None
+
+        # Poll shared state for up to 10 seconds
+        start = time.time()
+        while time.time() - start < 10:
+            latest = rfid_module.latest_rfid_scan
+            if latest:
+                new_tag = latest.get("rfid_tag")
+                if new_tag and new_tag != old_tag:
+                    return {"status": "success", "tag_id": new_tag}
+            time.sleep(0.2)
+
+        return {"status": "no_tag", "message": "No RFID tag detected. Tap sticker on the reader and try again."}
+
+    # Fallback: direct serial read if background polling is NOT active
+    reader = get_rfid_reader()
     if not reader.serial or not reader.serial.is_open:
         if not reader.connect():
             raise HTTPException(status_code=500, detail="RFID reader not available")
-
     try:
-        # Wait for tag for 5 seconds
-        tag_id = reader.wait_for_tag(timeout=5)
-
+        tag_id = reader.wait_for_tag(timeout=10)
         if not tag_id:
-            return {"status": "no_tag", "message": "No RFID tag detected"}
-
+            return {"status": "no_tag", "message": "No RFID tag detected. Tap sticker on the reader and try again."}
         return {"status": "success", "tag_id": tag_id}
-
     finally:
-        # We don't disconnect if background polling is supposed to stay active
-        from utils.rfid import rfid_polling_active
-        if not rfid_polling_active:
-            reader.disconnect()
+        reader.disconnect()
 
 @router.post("/connect")
 def connect_rfid_reader():
