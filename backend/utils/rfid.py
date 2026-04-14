@@ -59,18 +59,45 @@ class RFIDReader:
             rfid_is_connected = False
             print("[RFID] Reader disconnected")
 
+    # M5Stack UHF RFID inventory command (YRM100 protocol - single inventory)
+    INVENTORY_CMD = bytes([0xBB, 0x00, 0x22, 0x00, 0x00, 0x22, 0x7E])
+
+    def send_inventory_command(self):
+        """Send a single-inventory command to the M5Stack UHF reader."""
+        if self.serial and self.serial.is_open:
+            try:
+                self.serial.write(self.INVENTORY_CMD)
+            except Exception as e:
+                print(f"[RFID] Error sending inventory command: {e}")
+
     def read_tag(self) -> Optional[str]:
         """
-        Read a single RFID tag from serial buffer.
-        Returns the tag ID as string, or None if no tag detected.
+        Send an inventory command and read the UHF tag EPC response.
+        Returns the EPC tag ID as a hex string, or None if no tag detected.
         """
         if not self.serial or not self.serial.is_open:
             return None
         try:
+            # Send scan command to M5Stack UHF reader
+            self.send_inventory_command()
+            time.sleep(0.15)  # wait for reader to respond
+
             if self.serial.in_waiting > 0:
-                data = self.serial.readline().decode('utf-8', errors='ignore').strip()
-                if data:
-                    return data
+                raw = self.serial.read(self.serial.in_waiting)
+                # M5Stack UHF response frame: BB 02 22 00 <len> <rssi> <epc_bytes...> <crc> 7E
+                # Minimum valid response is 10 bytes
+                if len(raw) >= 10 and raw[0] == 0xBB and raw[-1] == 0x7E:
+                    # EPC starts at byte 7, ends 2 bytes before end (skip CRC + 0x7E)
+                    epc_bytes = raw[7:-2]
+                    if epc_bytes:
+                        return epc_bytes.hex().upper()
+                # Fallback: try to decode as plain text (for other reader modes)
+                try:
+                    decoded = raw.decode('utf-8', errors='ignore').strip()
+                    if decoded:
+                        return decoded
+                except Exception:
+                    pass
         except Exception as e:
             print(f"[RFID] Error reading tag: {e}")
         return None
