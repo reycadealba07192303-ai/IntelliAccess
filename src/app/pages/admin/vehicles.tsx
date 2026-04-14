@@ -235,7 +235,7 @@ const VehiclesPage = () => {
         </div>
 
         {/* Table Area */}
-        <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pt-6 pb-6 after:content-[''] after:block after:h-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
+        <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-280px)] min-h-[400px] px-6 pb-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600/50">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="sticky top-0 bg-[#0f172a] z-10 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-white/5 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
               <tr>
