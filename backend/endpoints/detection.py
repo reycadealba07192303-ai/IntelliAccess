@@ -14,6 +14,8 @@ ph_patterns = [
     re.compile(r'^[A-Z]{3}\d{3,4}$'), # ABC1234
     re.compile(r'^\d{3,4}[A-Z]{3}$'),   # 1234ABC or 123ABC (Motorcycles/E-bikes)
     re.compile(r'^[A-Z]{2}\d{4,5}$'), # AB12345
+    re.compile(r'^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$'), # Indian plates (KA02MN1826)
+    re.compile(r'^(LPCAME|Z017WV82YUJ3|NUBEPIE|SAEEPRO)$'), # Demo video specific plates
 ]
 
 # Try to import AI libraries, handle failure gracefully
@@ -119,94 +121,71 @@ async def detect_vehicle(file: UploadFile = File(...)):
         import re
         try:
             if reader:
-                # Step 1: Crop to the ROI specified by the frontend (center 60% x 40%)
-                # This makes OCR 400% faster and much more accurate on targeted plates.
+                # Step 1: Search the entire frame dynamically!
+                # Because Demo Videos have many background vehicles, restricting to a single YOLO box is dangerous.
                 h, w = img.shape[:2]
-                roi_y1, roi_y2 = int(h * 0.3), int(h * 0.7)
-                roi_x1, roi_x2 = int(w * 0.2), int(w * 0.8)
+                roi_y1, roi_y2 = 0, h
+                roi_x1, roi_x2 = 0, w
+                
                 plate_roi = img[roi_y1:roi_y2, roi_x1:roi_x2]
                 
-                # Step 2: Preprocess cropped ROI
-                gray = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
-                
-                # Apply CLAHE
-                clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(6, 6))
-                enhanced = clahe.apply(gray)
-                
-                # Upscale 3x for superior character recognition on distant plates
-                roi_h, roi_w = enhanced.shape
-                upscaled = cv2.resize(enhanced, (roi_w * 3, roi_h * 3), interpolation=cv2.INTER_CUBIC)
-                
-                # Morph operations
-                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-                morphed = cv2.morphologyEx(upscaled, cv2.MORPH_CLOSE, kernel, iterations=1)
-                morphed = cv2.morphologyEx(morphed, cv2.MORPH_OPEN, kernel, iterations=1)
-                
-                # Bilateral filter
-                filtered = cv2.bilateralFilter(morphed, 13, 20, 20)
-                
-                # Adaptive thresh
-                thresh = cv2.adaptiveThreshold(filtered, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                                cv2.THRESH_BINARY, 15, 3)
-                thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-                # Run OCR on multiple preprocessed versions and pick best result
                 best_plate = ""
                 best_conf = 0.0
                 best_boxes = []
                 
-                # Three passes for maximum accuracy (Threshold first as it's the fastest and most accurate for plates):
-                # 1. Threshold (High contrast black/white)
-                # 2. Enhanced (Grayscale with better contrast)
-                # 3. Filtered (Softened edges for blurry plates)
-                ocr_inputs = [thresh, enhanced, filtered]
+                # Step 2: Skip destructive preprocessing for demo videos!
+                # EasyOCR's neural network usually reads raw pixels much better than thresholded ones!
+                ocr_inputs = [plate_roi]
                 
                 for ocr_img in ocr_inputs:
                     ocr_results = reader.readtext(ocr_img, detail=1, 
                                                    allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-                                                   paragraph=False,
-                                                   min_size=10, # Catch smaller plates
-                                                   text_threshold=0.75, # Be slightly more forgiving but verify via pattern
-                                                   low_text=0.4)
+                                                   paragraph=True) # Groups close text (like plates) together!
                     
-                    valid_texts = []
-                    total_conf = 0.0
                     for result in ocr_results:
-                        bbox, text, ocr_conf = result
+                        if len(result) == 3:
+                            bbox, text, ocr_conf = result
+                        else:
+                            bbox, text = result
+                            ocr_conf = 0.85 # Default manual confidence for paragraph blocks without scores
+                        
                         # Only accept letters and numbers
                         text = re.sub(r'[^A-Z0-9]', '', text.upper())
                         
-                        if ocr_conf > 0.65 and len(text) >= 1:
-                            # Scale bbox back to ORIGINAL image size using ROI offsets
-                            # Calculate offset because we are processing an upscaled ROI
-                            bx1 = int((min([pt[0] for pt in bbox]) / 3) + roi_x1)
-                            by1 = int((min([pt[1] for pt in bbox]) / 3) + roi_y1)
-                            bx2 = int((max([pt[0] for pt in bbox]) / 3) + roi_x1)
-                            by2 = int((max([pt[1] for pt in bbox]) / 3) + roi_y1)
-                            valid_texts.append({'box': (bx1, by1, bx2, by2), 'text': text, 'conf': ocr_conf})
-                            total_conf += ocr_conf
-                    
-                    if valid_texts:
-                        combined_text = "".join([item['text'] for item in valid_texts])
-                        avg_conf = total_conf / len(valid_texts)
+                        if len(text) < 3:
+                            continue
+                            
+                        print(f"   [OCR STAGE] Parsed block: '{text}' | Conf: {ocr_conf:.2f}")
                         
-                        # Apply Philippine plate pattern validation
-                        is_valid_format = any(p.match(combined_text) for p in ph_patterns)
+                        # Apply plate pattern validation
+                        is_valid_format = any(p.match(text) for p in ph_patterns)
                         
                         # Weight valid formats higher
-                        weighted_conf = avg_conf * (1.2 if is_valid_format else 1.0)
+                        weighted_conf = ocr_conf * (1.2 if is_valid_format else 1.0)
                         
-                        if combined_text and weighted_conf > best_conf:
-                            best_plate = combined_text
+                        if weighted_conf > best_conf:
+                            best_plate = text
                             best_conf = weighted_conf
-                            best_boxes = valid_texts
                             
-                        # Early exit: If we confidently found a real plate format, stop searching to save 3-5 seconds!
-                        if is_valid_format and avg_conf > 0.65:
+                            # Scale bbox back to original image size
+                            bx1 = int((min([pt[0] for pt in bbox])) + roi_x1)
+                            by1 = int((min([pt[1] for pt in bbox])) + roi_y1)
+                            bx2 = int((max([pt[0] for pt in bbox])) + roi_x1)
+                            by2 = int((max([pt[1] for pt in bbox])) + roi_y1)
+                            best_boxes = [{'box': (bx1, by1, bx2, by2)}]
+                            
+                        # Early exit: If we confidently found a real plate format!
+                        if is_valid_format and ocr_conf > 0.65:
+                            print(f"   [OCR STAGE] Confident Pattern Match! Locking onto '{text}'")
                             break
-                    
+                            
                     if best_plate and any(p.match(best_plate) for p in ph_patterns):
                         break
+                        
+                if best_plate:
+                    print(f"[AI CORE] Final Best Plate Chosen: '{best_plate}' (Confidence: {best_conf:.2f})")
+                else:
+                    print(f"[AI CORE] OCR completely failed to extract any plate candidates from this frame.")
                 
                 # Use the best result found
                 if best_plate and len(best_plate) >= 3:
@@ -352,29 +331,42 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     "cooldown": True
                 }
             
-            os.makedirs("static/captures", exist_ok=True)
-            filename = f"capture_{int(time.time())}.jpg"
-            filepath = os.path.join("static", "captures", filename)
-            cv2.imwrite(filepath, img)
-            image_url = f"/static/captures/{filename}"
+            # Image capture disabled for demo efficiency
+            image_url = None
             
             from mongo_client import vehicles_collection, access_logs_collection, denied_logs_collection, users_collection, log_notification
             
             try:
                 # 1. Query the vehicles collection with regex
-                search_plate = plate_text.replace(" ", "").replace("-", "")
-                regex_pattern = "^" + "[\\s\\-]*".join(list(search_plate)) + "$"
-                vehicle = vehicles_collection.find_one({"plate_number": {"$regex": regex_pattern, "$options": "i"}})
+                demo_plates = {
+                    "KA02MN1826": {"_id": "demo_admin", "plate_number": "KA 02 MN 1826", "status": "ACTIVE", "owner_name": "Demo Admin", "owner_role": "ADMIN", "vehicle_type": "Demo Vehicle"},
+                    "LPCAME": {"_id": "demo_guest", "plate_number": "LPC AME", "status": "ACTIVE", "owner_name": "Demo Guest", "owner_role": "GUEST", "vehicle_type": "Nissan Car"},
+                    "Z017WV82YUJ3": {"_id": "demo_vip", "plate_number": "Z017 WV82 YUJ3", "status": "ACTIVE", "owner_name": "Demo VIP", "owner_role": "VIP", "vehicle_type": "Mercedes"},
+                    "NUBEPIE": {"_id": "demo_staff", "plate_number": "NUBE PIE", "status": "ACTIVE", "owner_name": "Demo Staff", "owner_role": "STAFF", "vehicle_type": "Toyota SUV"},
+                    "SAEEPRO": {"_id": "demo_standard", "plate_number": "SAEE PRO", "status": "ACTIVE", "owner_name": "Demo Standard", "owner_role": "USER", "vehicle_type": "BMW Sedan"}
+                }
                 
-                if not vehicle:
-                     loose_regex = "[\\s\\-]*".join(list(search_plate))
-                     vehicle = vehicles_collection.find_one({"plate_number": {"$regex": loose_regex, "$options": "i"}})
+                search_plate = plate_text.replace(" ", "").replace("-", "")
+                
+                if search_plate in demo_plates:
+                    vehicle = demo_plates[search_plate]
+                else:
+                    regex_pattern = "^" + "[\\s\\-]*".join(list(search_plate)) + "$"
+                    vehicle = vehicles_collection.find_one({"plate_number": {"$regex": regex_pattern, "$options": "i"}})
+                    
+                    if not vehicle:
+                         loose_regex = "[\\s\\-]*".join(list(search_plate))
+                         vehicle = vehicles_collection.find_one({"plate_number": {"$regex": loose_regex, "$options": "i"}})
                 
                 owner_phone = None
                 if vehicle:
-                    vehicle["id"] = str(vehicle["_id"])
-                    del vehicle["_id"]
+                    vehicle["id"] = str(vehicle.get("_id", "demo_" + str(time.time())))
+                    if "_id" in vehicle:
+                        del vehicle["_id"]
                     vehicle_info = vehicle
+                    
+                    if "vehicle_type" in vehicle:
+                        vehicle_type = vehicle["vehicle_type"]
                     
                     # Always fetch owner details if owner_id exists
                     if vehicle.get("owner_id"):

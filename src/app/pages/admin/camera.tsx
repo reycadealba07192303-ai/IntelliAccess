@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL, getSecureUrl } from "@/lib/api";
+import demoVideoAsset from "@/assets/Automatic Number Plate Recognition (ANPR) _ Vehicle Number Plate Recognition (1).mp4";
 const CameraPage = () => {
     const [selectedCamera, setSelectedCamera] = useState<number>(1);
     const [detectionResult, setDetectionResult] = useState<any>(null);
@@ -27,6 +28,7 @@ const CameraPage = () => {
     
     const toggleAutoScan = () => setIsAutoScanning(!isAutoScanning);
     const [isBrainMode, setIsBrainMode] = useState(true);
+    const [isDemoVideo, setIsDemoVideo] = useState(false);
     const [brainStatus, setBrainStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
     const [lastBrainResult, setLastBrainResult] = useState<any>(null);
 
@@ -188,9 +190,9 @@ const CameraPage = () => {
 
     // --- Backend-Driven Camera & AI Polling ---
     useEffect(() => {
-        let scanInterval: NodeJS.Timeout;
-        let clearTimer: NodeJS.Timeout;
-        let streamInterval: NodeJS.Timeout;
+        let scanInterval: ReturnType<typeof setInterval>;
+        let clearTimer: ReturnType<typeof setTimeout>;
+        let streamInterval: ReturnType<typeof setInterval>;
         let isMounted = true;
 
         if (selectedCamera === 1) {
@@ -297,7 +299,7 @@ const CameraPage = () => {
 
     // --- Local Webcam Polling (Laptop) ---
     useEffect(() => {
-        let captureInterval: NodeJS.Timeout;
+        let captureInterval: ReturnType<typeof setInterval>;
         let isMounted = true;
         
         let activeStream: MediaStream | null = null;
@@ -343,7 +345,7 @@ const CameraPage = () => {
 
         setupWebcam();
 
-        if (currentCamera.url === "local_webcam" && isAutoScanning && !isBrainMode) {
+        if ((currentCamera.url === "local_webcam" || isDemoVideo) && isAutoScanning && !isBrainMode) {
             captureInterval = setInterval(async () => {
                 if (scanningRef.current || !videoRef.current || !canvasRef.current) return;
                 
@@ -424,7 +426,7 @@ const CameraPage = () => {
                         if (isMounted) scanningRef.current = false;
                     }
                 }, "image/jpeg", 0.6);
-            }, 1500); // Capture and post a frame every 1.5 seconds
+            }, isDemoVideo ? 150 : 1500); // 150ms for Demo Video to scan almost every frame continuously!
         }
 
         return () => {
@@ -438,15 +440,15 @@ const CameraPage = () => {
 
     // Attach stream to video tag whenever either changes
     useEffect(() => {
-        if (currentCamera.url === "local_webcam" && videoRef.current && localStream) {
+        if (!isDemoVideo && currentCamera.url === "local_webcam" && videoRef.current && localStream) {
             videoRef.current.srcObject = localStream;
             videoRef.current.play().catch(e => console.error("Play error:", e));
         }
-    }, [currentCamera.url, localStream]);
+    }, [currentCamera.url, localStream, isDemoVideo]);
 
     // --- RFID Hardware Polling ---
     useEffect(() => {
-        let statusInterval: NodeJS.Timeout;
+        let statusInterval: ReturnType<typeof setInterval>;
         let isMounted = true;
 
         const checkRfid = async () => {
@@ -614,6 +616,17 @@ const CameraPage = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setIsDemoVideo(!isDemoVideo)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all font-bold text-xs ${
+                            isDemoVideo
+                                ? "bg-purple-500/10 border-purple-500/30 text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+                                : "bg-slate-800/50 border-white/5 text-slate-400"
+                        }`}
+                    >
+                        <Video className="h-4 w-4" />
+                        {isDemoVideo ? "DEMO VIDEO ON" : "DEMO VIDEO OFF"}
+                    </button>
                     <button 
                         onClick={() => setIsBrainMode(!isBrainMode)}
                         className={`group relative flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
@@ -658,7 +671,7 @@ const CameraPage = () => {
                 <div className="lg:col-span-2 space-y-6">
                     <GlassCard className="p-0 overflow-hidden relative group">
                         <div className="relative aspect-video bg-black">
-                            {selectedCamera === 1 ? (
+                            {selectedCamera === 1 && !isDemoVideo ? (
                                 <>
                                     {streamSrc ? (
                                         <img
@@ -719,13 +732,16 @@ const CameraPage = () => {
                                         </div>
                                     )}
                                 </>
-                            ) : currentCamera.url === "local_webcam" ? (
+                            ) : currentCamera.url === "local_webcam" || isDemoVideo ? (
                                 <>
                                     <video
                                         ref={videoRef}
                                         autoPlay
                                         playsInline
                                         muted
+                                        loop={isDemoVideo ? true : undefined}
+                                        src={isDemoVideo ? demoVideoAsset : undefined}
+                                        crossOrigin={isDemoVideo ? "anonymous" : undefined}
                                         className="w-full h-full object-cover"
                                     />
                                     {/* Scanning Target Box for Laptop */}
@@ -902,12 +918,7 @@ const CameraPage = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* Captured Image - Large */}
-                                            {detectionResult.image_url && (
-                                                <div className="h-32 w-40 overflow-hidden rounded-lg border-2 border-white/20 shrink-0 shadow-lg">
-                                                    <img src={`${API_BASE_URL}${detectionResult.image_url}`} alt="Captured" className="h-full w-full object-cover" />
-                                                </div>
-                                            )}
+                                            {/* Captured Image display removed per user request */}
                                         </div>
 
                                         {/* Vehicle Info Section */}

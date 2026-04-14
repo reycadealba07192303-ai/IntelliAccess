@@ -46,6 +46,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
           return;
         }
 
+        if (token === "demo-admin-token") {
+          setUserInfo({
+            name: "Demo Admin",
+            role: "ADMIN",
+            initial: "A",
+            profile_url: null
+          });
+          return;
+        }
+
         const res = await apiFetch("/auth/me");
         const user = res.user;
 

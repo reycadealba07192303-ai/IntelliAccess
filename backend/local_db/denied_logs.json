@@ -1,0 +1,29 @@
+[
+  {
+    "plate_detected": "23VBC",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:25:40.802077",
+    "image_url": "/static/captures/capture_1776192940.jpg",
+    "_id": "c8ece1bdecba4e829372321df28e3d0e"
+  },
+  {
+    "plate_detected": "IPCMNUBPESAI",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:37:18.876599",
+    "image_url": "/static/captures/capture_1776193638.jpg",
+    "_id": "3550af2ab386489ba856a774466dfc59"
+  },
+  {
+    "plate_detected": "LPCAME",
+    "action": "Entry",
+    "status": "DENIED",
+    "gate": "Main Gate",
+    "timestamp": "2026-04-15T00:43:51.645071",
+    "image_url": "/static/captures/capture_1776194031.jpg",
+    "_id": "cf240db63ecf422799180ffd034bb15f"
+  }
+]
