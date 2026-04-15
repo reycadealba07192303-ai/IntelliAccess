@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   LogOut,
-  ShieldCheck,
   Users,
   ChevronDown,
   User,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiFetch } from "@/lib/api";
+import intelliAccessLogo from "@/assets/intelliaccess-logo.png";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -179,7 +179,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-white/10">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-blue-500" />
+            <img src={intelliAccessLogo} alt="IntelliAccess Logo" className="h-8 w-8 object-contain" />
             <span className="text-lg font-bold tracking-tight">IntelliAccess</span>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400">

@@ -21,6 +21,7 @@ import sorsuLogo from "../../assets/sorsu.png";
 import danielaImg from "../../assets/daniela.jpg";
 import enzoImg from "../../assets/enzo.jpg";
 import jombrionesImg from "../../assets/jombriones.jpg";
+import intelliAccessLogo from "../../assets/intelliaccess-logo.png";
 
 const LandingPage = () => {
    const scrollToSection = (id: string) => {
@@ -44,9 +45,7 @@ const LandingPage = () => {
          {/* Navbar */}
          <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 lg:px-12 backdrop-blur-xl bg-[#030712]/70 border-b border-white/5 transition-all duration-300">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => scrollToSection('home')}>
-               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 shadow-lg shadow-blue-500/20">
-                  <ShieldCheck className="h-6 w-6 text-white" />
-               </div>
+               <img src={intelliAccessLogo} alt="IntelliAccess Logo" className="h-10 w-10 object-contain drop-shadow-lg" />
                <span className="text-xl font-bold tracking-tight text-white">IntelliAccess</span>
             </div>
 
@@ -416,7 +415,7 @@ const LandingPage = () => {
          <footer className="relative z-20 border-t border-white/10 bg-black py-12 text-center">
             <div className="mx-auto max-w-7xl px-6">
                <div className="mb-8 flex justify-center gap-6 text-slate-400">
-                  <ShieldCheck className="h-6 w-6 hover:text-white cursor-pointer transition-colors" />
+                  <img src={intelliAccessLogo} alt="IntelliAccess" className="h-6 w-6 object-contain opacity-60 hover:opacity-100 cursor-pointer transition-opacity" />
                   <Globe className="h-6 w-6 hover:text-white cursor-pointer transition-colors" />
                   <Mail className="h-6 w-6 hover:text-white cursor-pointer transition-colors" />
                </div>
