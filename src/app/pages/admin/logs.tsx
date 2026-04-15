@@ -290,6 +290,7 @@ const LogsPage = () => {
                       <td className="px-4 py-4 min-w-[220px]">
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-16 overflow-hidden rounded-xl bg-slate-900 border border-white/10 shrink-0 relative group/img shadow-inner flex items-center justify-center">
+                            {session.image_url ? (
                               <>
                                 <NgrokImage 
                                   src={`${API_BASE_URL}${session.image_url}`} 
