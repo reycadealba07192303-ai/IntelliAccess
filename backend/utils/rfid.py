@@ -173,13 +173,14 @@ def _process_rfid_tag(tag_id: str):
     if is_on_cooldown(tag_id):
         return
 
-        # Database lookup...
-        if not DB_AVAILABLE:
-            return
+    # Database lookup...
+    if not DB_AVAILABLE:
+        return
 
+    try:
         # Look up vehicle by rfid_tag field
         vehicle = vehicles_collection.find_one({"rfid_tag": tag_id})
-        
+    
         # [STRICT VALIDATION] If not registered, we ignore it to prevent noise
         # But we still log it once as "Denied" for security visibility if requested
         if not vehicle:
