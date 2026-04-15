@@ -198,8 +198,8 @@ const LogsPage = () => {
       </div>
 
       <GlassCard className="p-0 overflow-hidden relative shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] border border-white/5 bg-[#0a0f1e]/80 backdrop-blur-2xl flex flex-col min-h-[500px]">
-        {/* Header/Filters */}
-        <div className="px-6 pt-6 pb-6 bg-transparent z-10 flex flex-col gap-4 lg:flex-row lg:items-center border-b border-white/5">
+        {/* Header/Filters (Floating Island Design) */}
+        <div className="mx-6 mt-6 mb-6 p-4 bg-white/[0.02] rounded-2xl z-10 flex flex-col gap-4 lg:flex-row lg:items-center border border-white/5 shadow-sm">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
@@ -243,7 +243,7 @@ const LogsPage = () => {
         </div>
 
         {/* Table Area with Custom Scrollbar */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] px-6 pt-0 pb-6 custom-scrollbar scroll-smooth">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] px-6 pt-2 pb-6 custom-scrollbar scroll-smooth">
           <style>{`
             .custom-scrollbar::-webkit-scrollbar {
               width: 6px;
