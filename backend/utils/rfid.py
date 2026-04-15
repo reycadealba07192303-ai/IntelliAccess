@@ -66,6 +66,8 @@ class RFIDReader:
         """Send a single-inventory command to the M5Stack UHF reader."""
         if self.serial and self.serial.is_open:
             try:
+                # Clear buffer of stale data before sending new command
+                self.serial.reset_input_buffer()
                 self.serial.write(self.INVENTORY_CMD)
             except Exception as e:
                 print(f"[RFID] Error sending inventory command: {e}")
@@ -84,23 +86,40 @@ class RFIDReader:
 
             if self.serial.in_waiting > 0:
                 raw = self.serial.read(self.serial.in_waiting)
-                # Split by 0x7E to handle multiple concatenated frames in the buffer
-                frames = raw.split(b'\x7E')
-                for frame in frames:
-                    # Minimum valid response is 9 bytes before the 0x7E
-                    if len(frame) >= 9 and frame[0] == 0xBB:
-                        # EPC starts at byte 7, ends 2 bytes before the end (which are CRC)
-                        epc_bytes = frame[7:-2]
-                        if epc_bytes:
-                            return epc_bytes.hex().upper()
                 
-                # Fallback: try to decode as plain text (for other reader modes)
-                try:
-                    decoded = raw.decode('utf-8', errors='ignore').strip()
-                    if decoded:
-                        return decoded
-                except Exception:
-                    pass
+                # Robust frame parsing: Find the first 0xBB in the raw buffer
+                # Then look for the next 0x7E or just trust the length field
+                if b'\xBB' in raw:
+                    idx = raw.find(b'\xBB')
+                    frame = raw[idx:]
+                    
+                    # Split by 0x7E to handle multiple or trailing data
+                    sub_frames = frame.split(b'\x7E')
+                    for f in sub_frames:
+                        if len(f) >= 9 and f[0] == 0xBB:
+                            if len(f) > 2 and f[2] == 0x22:  # Inventory response
+                                # PC bits at index 6,7
+                                pc_high = f[6]
+                                epc_words = (pc_high & 0xF8) >> 3
+                                epc_bytes_len = epc_words * 2
+                                
+                                epc_start = 8
+                                epc_end = epc_start + epc_bytes_len
+                                
+                                if len(f) >= epc_end:
+                                    epc_bytes = f[epc_start:epc_end]
+                                    tag_id = epc_bytes.hex().upper()
+                                    if len(tag_id) >= 8: # Minimum valid EPC length
+                                        return tag_id
+                            else:
+                                # Fallback: assume EPC starts at 7, stops 2 bytes from end (CRC)
+                                if len(f) > 9:
+                                    epc_bytes = f[7:-2]
+                                    tag_id = epc_bytes.hex().upper()
+                                    if len(tag_id) >= 8:
+                                        return tag_id
+
+                # We removed the UTF-8 fallback to avoid garbage data (noise)
         except Exception as e:
             print(f"[RFID] Error reading tag: {e}")
         return None
