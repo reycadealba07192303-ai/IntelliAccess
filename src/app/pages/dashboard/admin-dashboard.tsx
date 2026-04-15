@@ -124,8 +124,69 @@ const AdminDashboard = ({ children }: { children?: React.ReactNode }) => {
     return <DashboardLayout>{children}</DashboardLayout>;
   }
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     showNotification("Generating report... Download will start shortly.", "info");
+
+    try {
+      const stats = await apiFetch("/stats");
+      const rawLogs = await apiFetch("/logs?limit=500");
+      
+      const content = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>Dashboard Report</title></head>
+        <body>
+          <h1>IntelliAccess Dashboard Report</h1>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+          
+          <h2>Summary Statistics</h2>
+          <ul>
+            <li>Total Users: ${stats.total_users || 0}</li>
+            <li>Total Vehicles: ${stats.total_vehicles || 0}</li>
+            <li>Today's Entries: ${stats.todays_entries || 0}</li>
+            <li>Unauthorized Attempts: ${stats.unauthorized_attempts || 0}</li>
+          </ul>
+
+          <h2>Recent Access Logs</h2>
+          <table border="1" style="border-collapse: collapse; width: 100%;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="padding: 8px;">Time</th>
+                <th style="padding: 8px;">Action</th>
+                <th style="padding: 8px;">Plate / RFID</th>
+                <th style="padding: 8px;">Gate</th>
+                <th style="padding: 8px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(rawLogs || []).slice(0, 100).map((log: any) => `
+                <tr>
+                  <td style="padding: 8px;">${new Date(log.created_at || log.timestamp).toLocaleString()}</td>
+                  <td style="padding: 8px;">${log.action}</td>
+                  <td style="padding: 8px;">${log.plate_detected || log.rfid_tag || "Unknown"}</td>
+                  <td style="padding: 8px;">${log.gate?.replace('_', ' ') || "Unknown"}</td>
+                  <td style="padding: 8px;">${log.status}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([content], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = \`dashboard-report-\${new Date().toISOString().split('T')[0]}.doc\`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      showNotification("Report downloaded successfully!", "success");
+    } catch (error) {
+      console.error("Error generating report:", error);
+      showNotification("Failed to generate report", "error");
+    }
   };
 
   return (
