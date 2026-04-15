@@ -17,43 +17,17 @@ export function NgrokImage({ src, alt, className, style, ...props }: NgrokImageP
     useEffect(() => {
         if (!src) return;
 
-        let isMounted = true;
         setLoading(true);
         setError(false);
 
-        const loadImage = async () => {
-            try {
-                const response = await fetch(src, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true',
-                    },
-                });
-
-                if (!response.ok) throw new Error('Failed to load image');
-
-                const blob = await response.blob();
-                if (isMounted) {
-                    const objectUrl = URL.createObjectURL(blob);
-                    setImageUrl(objectUrl);
-                    setLoading(false);
-                }
-            } catch (err) {
-                console.error("NgrokImage load error:", err);
-                if (isMounted) {
-                    setError(true);
-                    setLoading(false);
-                }
-            }
-        };
-
-        loadImage();
-
-        return () => {
-            isMounted = false;
-            if (imageUrl) {
-                URL.revokeObjectURL(imageUrl);
-            }
-        };
+        // Standard Ngrok bypass via query parameter is MORE reliable than headers 
+        // because it doesn't trigger CORS preflight (OPTIONS) requests.
+        const bypassUrl = src.includes('?') 
+            ? `${src}&ngrok-skip-browser-warning=1` 
+            : `${src}?ngrok-skip-browser-warning=1`;
+            
+        setImageUrl(bypassUrl);
+        setLoading(false);
     }, [src]);
 
     if (error) {
