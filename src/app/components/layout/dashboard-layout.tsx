@@ -14,7 +14,8 @@ import {
   Camera,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { NgrokImage } from "../figma/NgrokImage";
 import intelliAccessLogo from "@/assets/intelliaccess-logo.png";
 
 interface DashboardLayoutProps {
@@ -284,7 +285,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
                             >
                               <div className="flex justify-between items-start gap-3">
                                 {notification.profile_url ? (
-                                  <img src={notification.profile_url} alt="Profile" className="h-8 w-8 rounded-full object-cover shrink-0 mt-1" />
+                                  <NgrokImage src={notification.profile_url.startsWith('http') ? notification.profile_url : `${API_BASE_URL}${notification.profile_url}`} alt="Profile" className="h-8 w-8 rounded-full object-cover shrink-0 mt-1" />
                                 ) : (
                                   <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0 mt-1">
                                     <Bell className="h-4 w-4 text-slate-400" />
@@ -322,7 +323,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
               className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 ring-2 ring-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/60 overflow-hidden"
             >
               {userInfo.profile_url ? (
-                <img src={userInfo.profile_url} alt="Profile" className="h-full w-full object-cover" />
+                <NgrokImage src={userInfo.profile_url.startsWith('http') ? userInfo.profile_url : `${API_BASE_URL}${userInfo.profile_url}`} alt="Profile" className="h-full w-full object-cover" />
               ) : (
                 <span className="text-xs font-semibold text-white">{userInfo.initial}</span>
               )}
@@ -333,7 +334,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, userType = 
                 <div className="flex items-center gap-3 rounded-lg px-2 py-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 text-xs font-semibold overflow-hidden">
                     {userInfo.profile_url ? (
-                      <img src={userInfo.profile_url} alt="Profile" className="h-full w-full object-cover" />
+                      <NgrokImage src={userInfo.profile_url.startsWith('http') ? userInfo.profile_url : `${API_BASE_URL}${userInfo.profile_url}`} alt="Profile" className="h-full w-full object-cover" />
                     ) : (
                       userInfo.initial
                     )}

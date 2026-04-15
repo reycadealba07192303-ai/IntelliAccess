@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL, getSecureUrl } from "@/lib/api";
+import { NgrokImage } from "../../components/figma/NgrokImage";
 const CameraPage = () => {
     const [selectedCamera, setSelectedCamera] = useState<number>(1);
     const [detectionResult, setDetectionResult] = useState<any>(null);
@@ -904,8 +905,12 @@ const CameraPage = () => {
                                             
                                             {/* Captured Image - Large */}
                                             {detectionResult.image_url && (
-                                                <div className="h-32 w-40 overflow-hidden rounded-lg border-2 border-white/20 shrink-0 shadow-lg">
-                                                    <img src={`${API_BASE_URL}${detectionResult.image_url}`} alt="Captured" className="h-full w-full object-cover" />
+                                                <div className="h-32 w-40 overflow-hidden rounded-lg border-2 border-white/20 shrink-0 shadow-lg bg-slate-900 flex items-center justify-center">
+                                                    <NgrokImage 
+                                                        src={`${API_BASE_URL}${detectionResult.image_url}`} 
+                                                        alt="Captured" 
+                                                        className="h-full w-full object-cover" 
+                                                    />
                                                 </div>
                                             )}
                                         </div>

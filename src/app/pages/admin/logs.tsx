@@ -3,6 +3,7 @@ import { GlassCard } from "../../components/ui/glass-components";
 import { Search, Calendar, MapPin, Download, Eye } from "lucide-react";
 import { useNotification } from "../../context/NotificationContext";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { NgrokImage } from "../../components/figma/NgrokImage";
 
 interface AccessLog {
   id: number;
@@ -289,24 +290,14 @@ const LogsPage = () => {
                       <td className="px-4 py-4 min-w-[220px]">
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-16 overflow-hidden rounded-xl bg-slate-900 border border-white/10 shrink-0 relative group/img shadow-inner flex items-center justify-center">
-                            {session.image_url ? (
                               <>
-                                <img 
+                                <NgrokImage 
                                   src={`${API_BASE_URL}${session.image_url}`} 
                                   alt="Plate" 
                                   className="h-full w-full object-cover transition-transform group-hover/img:scale-110" 
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                                  }}
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer backdrop-blur-[1px]">
                                   <Eye className="h-4 w-4 text-white" />
-                                </div>
-                                {/* Native Fallback if image fails to load */}
-                                <div className="hidden absolute inset-0 flex-col items-center justify-center opacity-40 bg-slate-900 pointer-events-none">
-                                  <Search className="h-4 w-4 text-slate-400 mb-0.5" />
-                                  <span className="text-[8px] uppercase font-bold tracking-tighter text-slate-500">NO IMG</span>
                                 </div>
                               </>
                             ) : (
