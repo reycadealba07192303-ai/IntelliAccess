@@ -48,3 +48,14 @@ def trigger_hardware_denied():
         led_denied()
     except Exception as e:
         print(f"[HARDWARE] Error triggering denied hardware: {e}")
+
+
+def trigger_hardware_restricted():
+    """Trigger 3 short beeps for registered but non-active tags."""
+    try:
+        from utils.buzzer import buzz_restricted
+        from utils.led_utils import led_denied
+        buzz_restricted()
+        led_denied()
+    except Exception as e:
+        print(f"[HARDWARE] Error triggering restricted hardware: {e}")

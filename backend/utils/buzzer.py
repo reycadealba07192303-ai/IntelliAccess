@@ -48,6 +48,12 @@ def buzz_denied():
     threading.Thread(target=_buzz, args=(5.0, 1), daemon=True).start()
 
 
+def buzz_restricted():
+    """Three short beeps = REGISTERED BUT RESTRICTED (e.g., Blacklisted)."""
+    print("[BUZZER] Triggered: RESTRICTED (3 short beeps)")
+    threading.Thread(target=_buzz, args=(0.3, 3, 0.2), daemon=True).start()
+
+
 def buzz_once(duration: float = 0.2):
     """Single beep for generic feedback."""
     threading.Thread(target=_buzz, args=(duration, 1), daemon=True).start()

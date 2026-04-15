@@ -8,7 +8,7 @@ import time
 import threading
 from typing import Optional
 from datetime import datetime
-from utils.access_utils import is_on_cooldown, set_cooldown, trigger_hardware_success, trigger_hardware_denied
+from utils.access_utils import is_on_cooldown, set_cooldown, trigger_hardware_success, trigger_hardware_denied, trigger_hardware_restricted
 
 # ─── Shared State (used by both Camera AI and RFID modules) ───────────────────
 # This is the single source of truth for the last access event regardless of method
@@ -109,14 +109,15 @@ class RFIDReader:
                                 if len(f) >= epc_end:
                                     epc_bytes = f[epc_start:epc_end]
                                     tag_id = epc_bytes.hex().upper()
-                                    if len(tag_id) >= 8: # Minimum valid EPC length
+                                    # Strict validation: Only allow if it's high-quality hex and reasonable length
+                                    if len(tag_id) >= 8 and all(c in '0123456789ABCDEF' for c in tag_id):
                                         return tag_id
                             else:
                                 # Fallback: assume EPC starts at 7, stops 2 bytes from end (CRC)
                                 if len(f) > 9:
                                     epc_bytes = f[7:-2]
                                     tag_id = epc_bytes.hex().upper()
-                                    if len(tag_id) >= 8:
+                                    if len(tag_id) >= 8 and all(c in '0123456789ABCDEF' for c in tag_id):
                                         return tag_id
 
                 # We removed the UTF-8 fallback to avoid garbage data (noise)
@@ -172,55 +173,66 @@ def _process_rfid_tag(tag_id: str):
     if is_on_cooldown(tag_id):
         return
 
-    # Database lookup...
+        # Database lookup...
+        if not DB_AVAILABLE:
+            return
 
-    if not DB_AVAILABLE:
-        return
-
-    try:
         # Look up vehicle by rfid_tag field
         vehicle = vehicles_collection.find_one({"rfid_tag": tag_id})
+        
+        # [STRICT VALIDATION] If not registered, we ignore it to prevent noise
+        # But we still log it once as "Denied" for security visibility if requested
+        if not vehicle:
+            print(f"[RFID] Ignoring unregistered tag: {tag_id}")
+            
+            # Log as unregistered event but don't trigger buzzer or shared state
+            log_data = {
+                "plate_detected": "Unregistered RFID",
+                "rfid_tag": tag_id,
+                "action": "Attempt",
+                "status": "DENIED",
+                "gate": "Main Gate Entry",
+                "method": "RFID",
+                "timestamp": datetime.now().isoformat(),
+                "image_url": None
+            }
+            denied_logs_collection.insert_one(log_data)
+            return
+
+        # If we reach here, the vehicle IS registered
         status = "Denied"
         vehicle_info = None
         owner_phone = None
 
-        if vehicle:
-            vehicle["id"] = str(vehicle["_id"])
-            del vehicle["_id"]
-            vehicle_info = vehicle
+        vehicle["id"] = str(vehicle["_id"])
+        del vehicle["_id"]
+        vehicle_info = vehicle
 
-            v_status = vehicle.get("status", "").strip().upper()
-            if v_status == "ACTIVE":
-                status = "Authorized"
-            elif v_status == "PENDING":
-                status = "Denied (Pending)"
-            elif v_status == "BLACKLISTED":
-                status = "Denied (Blacklisted)"
+        v_status = vehicle.get("status", "").strip().upper()
+        if v_status == "ACTIVE":
+            status = "Authorized"
+        elif v_status == "PENDING":
+            status = "Denied (Pending)"
+        elif v_status == "BLACKLISTED":
+            status = "Denied (Blacklisted)"
 
-            # Get owner phone for SMS
-            if vehicle_info.get("owner_id"):
-                try:
-                    from bson import ObjectId
-                    owner_doc = users_collection.find_one({"_id": ObjectId(vehicle_info["owner_id"])})
-                    if owner_doc:
-                        owner_phone = owner_doc.get("phone")
-                        if "owner_name" not in vehicle_info:
-                            vehicle_info["owner_name"] = owner_doc.get("name", "Unknown")
-                except Exception as ex:
-                    print(f"[RFID] Failed to lookup owner: {ex}")
-                    
-            # Check Vehicle-ID based cooldown
-            vehicle_id = vehicle["id"] # Use the string ID we already created
-            if is_on_cooldown(vehicle_id):
-                print(f"[RFID] Ignoring {tag_id} - recently logged via ID {vehicle_id}")
-                return
+        # Get owner phone for SMS
+        if vehicle_info.get("owner_id"):
+            try:
+                from bson import ObjectId
+                owner_doc = users_collection.find_one({"_id": ObjectId(vehicle_info["owner_id"])})
+                if owner_doc:
+                    owner_phone = owner_doc.get("phone")
+                    if "owner_name" not in vehicle_info:
+                        vehicle_info["owner_name"] = owner_doc.get("name", "Unknown")
+            except Exception as ex:
+                print(f"[RFID] Failed to lookup owner: {ex}")
                 
-            if v_status == "ACTIVE":
-                status = "Authorized"
-            elif v_status == "PENDING":
-                status = "Denied (Pending)"
-            elif v_status == "BLACKLISTED":
-                status = "Denied (Blacklisted)"
+        # Check Vehicle-ID based cooldown
+        vehicle_id = vehicle["id"] 
+        if is_on_cooldown(vehicle_id):
+            print(f"[RFID] Ignoring {tag_id} - recently logged via ID {vehicle_id}")
+            return
 
         # Check Entry/Exit
         action = "Entry"
@@ -246,20 +258,18 @@ def _process_rfid_tag(tag_id: str):
                         action = "Exit"
 
         # Log the event
-        log_entry_id = None
         current_time_str = datetime.now().strftime("%I:%M %p")
         log_data = {
-            "plate_detected": vehicle_info.get("plate_number", "Unregistered RFID") if vehicle_info else "Unregistered RFID",
+            "plate_detected": vehicle_info.get("plate_number", tag_id),
             "rfid_tag": tag_id,
             "action": action,
             "status": "GRANTED" if status == "Authorized" else "DENIED",
             "gate": "Main Gate Entry",
             "method": "RFID",
             "timestamp": datetime.now().isoformat(),
+            "vehicle_id": vehicle_info.get("id"),
             "image_url": None
         }
-        if vehicle_info:
-            log_data["vehicle_id"] = vehicle_info.get("id")
 
         if status == "Authorized":
             result = access_logs_collection.insert_one(log_data)
@@ -269,19 +279,19 @@ def _process_rfid_tag(tag_id: str):
 
         # Update cooldowns
         set_cooldown(tag_id)
-        if vehicle_info:
-            set_cooldown(vehicle_info.get("id"))
-            if vehicle_info.get("plate_number"):
-                set_cooldown(vehicle_info["plate_number"])
+        set_cooldown(vehicle_info.get("id"))
+        if vehicle_info.get("plate_number"):
+            set_cooldown(vehicle_info["plate_number"])
 
         # Trigger Hardware
         if status == "Authorized":
             trigger_hardware_success()
         else:
-            trigger_hardware_denied()
+            # For registered but denied, we use a distinct pattern (3 short beeps)
+            trigger_hardware_restricted()
 
         # Send notification + SMS if authorized
-        if status == "Authorized" and vehicle_info:
+        if status == "Authorized":
             log_notification(
                 title=f"RFID {action}",
                 message=f"Vehicle {vehicle_info.get('plate_number', tag_id)} {action.lower()}ed via RFID at {current_time_str}.",
@@ -301,13 +311,13 @@ def _process_rfid_tag(tag_id: str):
                 except Exception as e:
                     print(f"[RFID] SMS error: {e}")
 
-        print(f"[RFID] Logged Tag: {tag_id} | Vehicle: {vehicle_info.get('plate_number', 'Unknown') if vehicle_info else 'Unknown'} | Status: {status}")
+        print(f"[RFID] Logged Tag: {tag_id} | Vehicle: {vehicle_info.get('plate_number', 'Unknown')} | Status: {status}")
 
         # Update shared scan state (frontend polls /rfid/latest-scan)
         latest_rfid_scan = {
             "id": log_entry_id,
             "timestamp": current_time,
-            "plate_number": vehicle_info.get("plate_number", tag_id) if vehicle_info else tag_id,
+            "plate_number": vehicle_info.get("plate_number", tag_id),
             "rfid_tag": tag_id,
             "access_granted": status == "Authorized",
             "access_status": "GRANTED" if status == "Authorized" else status.upper(),
