@@ -258,6 +258,32 @@ def _process_rfid_tag(tag_id: str):
                     except Exception:
                         action = "Exit"
 
+        # Save frame capture by grabbing the latest frame from the camera stream
+        image_url = None
+        try:
+            import endpoints.stream as stream_module
+            import cv2
+            import os
+            
+            frame = stream_module.latest_frame_raw
+            if frame is not None:
+                # Use shared captures directory
+                STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "captures")
+                if not os.path.exists(STATIC_DIR):
+                    os.makedirs(STATIC_DIR, exist_ok=True)
+                
+                filename = f"rfid_capture_{int(time.time())}.jpg"
+                filepath = os.path.join(STATIC_DIR, filename)
+                
+                # Save the frame
+                if cv2.imwrite(filepath, frame):
+                    image_url = f"/static/captures/{filename}"
+                    print(f"[RFID] Snapshot captured for tag {tag_id} at {image_url}")
+            else:
+                print("[RFID] No camera frame available for snapshot.")
+        except Exception as cam_err:
+            print(f"[RFID] Snapshot error: {cam_err}")
+
         # Log the event
         current_time_str = datetime.now().strftime("%I:%M %p")
         log_data = {
@@ -269,7 +295,7 @@ def _process_rfid_tag(tag_id: str):
             "method": "RFID",
             "timestamp": datetime.now().isoformat(),
             "vehicle_id": vehicle_info.get("id"),
-            "image_url": None
+            "image_url": image_url
         }
 
         if status == "Authorized":
