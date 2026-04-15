@@ -328,15 +328,18 @@ def _process_rfid_tag(tag_id: str):
             if owner_phone:
                 try:
                     from utils.sms import send_access_sms
-                    threading.Thread(target=send_access_sms, kwargs={
-                        "phone_number": owner_phone,
-                        "owner_name": vehicle_info.get("owner_name", "Unknown"),
-                        "plate_number": vehicle_info.get("plate_number", tag_id),
-                        "time_str": current_time_str,
-                        "action": action
-                    }).start()
+                    print(f"[RFID] Triggering {action} SMS to {owner_phone} for vehicle {vehicle_info.get('plate_number')}")
+                    send_access_sms(
+                        phone_number=owner_phone,
+                        owner_name=vehicle_info.get("owner_name", "Unknown"),
+                        plate_number=vehicle_info.get("plate_number", tag_id),
+                        time_str=current_time_str,
+                        action=action
+                    )
                 except Exception as e:
                     print(f"[RFID] SMS error: {e}")
+            else:
+                print(f"[RFID] SMS skipped: No phone number found for owner of vehicle {vehicle_info.get('plate_number')}")
 
         print(f"[RFID] Logged Tag: {tag_id} | Vehicle: {vehicle_info.get('plate_number', 'Unknown')} | Status: {status}")
 

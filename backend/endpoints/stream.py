@@ -292,29 +292,30 @@ def log_plate_detection(plate_text: str, frame=None):
                 
                 # --- START SMS INTEGRATION ---
                 # If the entry was granted and we found a phone number, send the SMS
-                if status == "Authorized" and owner_phone and vehicle_info:
+                if status == "Authorized" and vehicle_info:
                     owner_name = vehicle_info.get("owner_name", "Unknown")
-                    
-                    # Format time nicely for the SMS (e.g. 08:05 PM)
                     current_time_str = datetime.now().strftime("%I:%M %p")
                     
-                    # Added notification for the dashboard
+                    # Dashboard notification
                     log_notification(
                         title=f"Vehicle {action}",
                         message=f"Your vehicle {plate_text} {action.lower()}ed the university at {current_time_str}.",
                         user_id=vehicle_info.get("owner_id"),
                         type="alert"
                     )
-                    
-                    # Send SMS for both Entry and Exit
-                    print(f"[STREAM DETECT] Triggering {action} SMS to {owner_name} ({owner_phone})")
-                    send_access_sms(
-                        phone_number=owner_phone,
-                        owner_name=owner_name,
-                        plate_number=plate_text,
-                        time_str=current_time_str,
-                        action=action
-                    )
+
+                    if owner_phone:
+                        # Send SMS for both Entry and Exit
+                        print(f"[STREAM DETECT] Triggering {action} SMS to {owner_name} ({owner_phone}) for plate {plate_text}")
+                        send_access_sms(
+                            phone_number=owner_phone,
+                            owner_name=owner_name,
+                            plate_number=plate_text,
+                            time_str=current_time_str,
+                            action=action
+                        )
+                    else:
+                        print(f"[STREAM DETECT] SMS skipped for {plate_text}: No phone number found for owner {owner_name}")
                 # --- END SMS INTEGRATION ---
             else:
                 status = "Cooldown Active"

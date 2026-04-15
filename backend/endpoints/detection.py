@@ -433,7 +433,7 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     denied_logs_collection.insert_one(log_entry)
                     
                 # 4. SMS Notification
-                if access_granted and owner_phone and vehicle_info:
+                if access_granted and vehicle_info:
                     try:
                         from utils.sms import send_access_sms
                         owner_name = vehicle_info.get("owner_name", "Unknown")
@@ -446,14 +446,17 @@ async def detect_vehicle(file: UploadFile = File(...)):
                             type="alert"
                         )
                         
-                        import threading
-                        threading.Thread(target=send_access_sms, kwargs={
-                            "phone_number": owner_phone,
-                            "owner_name": owner_name,
-                            "plate_number": plate_text,
-                            "time_str": current_time_str,
-                            "action": action
-                        }).start()
+                        if owner_phone:
+                            print(f"[DETECT] Triggering {action} SMS to {owner_name} ({owner_phone}) for plate {plate_text}")
+                            send_access_sms(
+                                phone_number=owner_phone,
+                                owner_name=owner_name,
+                                plate_number=plate_text,
+                                time_str=current_time_str,
+                                action=action
+                            )
+                        else:
+                            print(f"[DETECT] SMS skipped for {plate_text}: No phone number found for owner {owner_name}")
                     except Exception as sms_e:
                         print(f"SMS Error: {sms_e}")
                     
