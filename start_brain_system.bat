@@ -4,7 +4,7 @@ echo ==================================================
 echo Starting IntelliAccess AI Brain and Ngrok Tunnel...
 echo ==================================================
 
-cd /d "c:\Users\reyca\Downloads\INTELLIACCESS"
+cd /d "%~dp0"
 
 :: 1. Start the FASTAPI Brain Server minimized in the background
 echo Loading YOLO and EasyOCR models (Please wait)...
