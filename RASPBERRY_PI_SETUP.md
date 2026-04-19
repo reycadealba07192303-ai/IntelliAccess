@@ -224,7 +224,7 @@ After=network.target
 Type=simple
 User=intelliaacess
 WorkingDirectory=/home/intelliaacess/IntelliAccess/backend
-ExecStart=/home/intelliaacess/IntelliAccess/backend/venv/bin/python main.py
+ExecStart=/home/intelliaacess/IntelliAccess/backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
 
