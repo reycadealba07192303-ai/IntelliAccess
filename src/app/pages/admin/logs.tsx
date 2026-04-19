@@ -189,60 +189,108 @@ const LogsPage = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handlePdfExport = () => {
+  const handlePdfExport = async () => {
     if (filteredLogs.length === 0) {
       showNotification("No logs available to export.", "warning");
       return;
     }
 
-    showNotification("Generating PDF report...", "info");
+    // Safety check for large datasets
+    const logsWithImages = filteredLogs.slice(0, 200);
+    if (filteredLogs.length > 200) {
+      showNotification("Large history detected. Including images for the latest 200 records only.", "info");
+    }
+
+    showNotification("Processing images and generating PDF...", "info");
 
     const doc = new jsPDF();
-    const tableColumn = ["Plate Number", "User Role", "Gate", "Date", "Time In", "Time Out", "Status"];
+    const tableColumn = ["Plate Image", "Details", "User Type", "Gate", "Date", "Status"];
     const tableRows: any[] = [];
 
-    filteredLogs.forEach(session => {
+    // Helper to get Base64 image
+    const getBase64Image = (url: string): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    };
+
+    // Prepare rows and fetch images
+    const processedRows = await Promise.all(logsWithImages.map(async (session) => {
       const role = session.vehicle?.owner?.role || "GUEST";
       const displayRole = role.charAt(0) + role.slice(1).toLowerCase();
+      const ownerName = session.vehicle?.owner?.full_name || "Guest / Unknown";
       
-      const logData = [
-        session.plate,
-        displayRole,
-        session.gate,
-        session.date,
-        session.time_in,
-        session.time_out,
-        session.status === "GRANTED" ? "Authorized" : session.status
-      ];
-      tableRows.push(logData);
-    });
+      let base64 = null;
+      if (session.image_url) {
+        base64 = await getBase64Image(`${API_BASE_URL}${session.image_url}`);
+      }
+
+      return {
+        data: [
+          "", // Placeholder for image
+          `${session.plate}\n${ownerName}`,
+          displayRole,
+          session.gate,
+          `${session.date}\n${session.time_in}`,
+          session.status === "GRANTED" ? "Authorized" : session.status
+        ],
+        image: base64
+      };
+    }));
 
     // Header styling
-    doc.setFontSize(18);
+    doc.setFontSize(22);
     doc.setTextColor(22, 160, 133);
-    doc.text("IntelliAccess - Vehicle History Report", 14, 22);
+    doc.text("IntelliAccess - Vehicle Access Report", 14, 22);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
-    doc.text(`Total Records: ${filteredLogs.length}`, 14, 35);
+    doc.text(`University Entrance / Exit History | Professional Report`, 14, 30);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 35);
+    doc.text(`Records Included: ${logsWithImages.length}`, 14, 40);
     
     if (dateFilter) {
-      doc.text(`Filtered Date: ${new Date(dateFilter).toLocaleDateString()}`, 14, 40);
+      doc.text(`Report Date: ${new Date(dateFilter).toLocaleDateString()}`, 14, 45);
     }
 
     autoTable(doc, {
       head: [tableColumn],
-      body: tableRows,
-      startY: 45,
+      body: processedRows.map(r => r.data),
+      startY: 50,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      alternateRowStyles: { fillColor: [245, 245, 245] }
+      styles: { fontSize: 8, cellPadding: 4, minCellHeight: 20, valign: 'middle' },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: 'center' },
+      bodyStyles: { halign: 'center' },
+      columnStyles: {
+        0: { cellWidth: 35 }, // Image column
+        1: { halign: 'left', fontStyle: 'bold' }
+      },
+      didDrawCell: (data) => {
+        if (data.column.index === 0 && data.cell.section === 'body') {
+          const rowIndex = data.row.index;
+          const imgBase64 = processedRows[rowIndex]?.image;
+          if (imgBase64) {
+            const x = data.cell.x + 2;
+            const y = data.cell.y + 2;
+            doc.addImage(imgBase64, 'JPEG', x, y, 31, 16);
+          }
+        }
+      }
     });
 
-    doc.save(`IntelliAccess_History_${new Date().toISOString().split('T')[0]}.pdf`);
-    showNotification("PDF Report Downloaded", "success");
+    doc.save(`IntelliAccess_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    showNotification("Professional PDF Report Downloaded", "success");
   };
 
   return (
