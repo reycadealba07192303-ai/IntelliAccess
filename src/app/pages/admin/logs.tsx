@@ -387,7 +387,7 @@ const LogsPage = () => {
             }
           `}</style>
           <table className="w-full text-left text-sm text-slate-400 border-collapse">
-            <thead className="sticky top-0 bg-[#0a0f1e]/80 backdrop-blur-xl z-20 text-[10px] uppercase font-bold tracking-widest text-slate-500 border-b border-white/5 shadow-sm">
+            <thead className="sticky top-0 bg-[#0a0f1e] z-20 text-[10px] uppercase font-bold tracking-widest text-slate-500 shadow-[0_4px_20px_-10px_rgba(0,0,0,1)] border-b border-white/10">
               <tr>
                 <th className="px-4 py-4 font-bold min-w-[220px]">Vehicle Details</th>
                 <th className="px-4 py-4 font-bold">User Access</th>
