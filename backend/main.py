@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
 import sys
-import os
+
 # Add the current directory to sys.path locally
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from endpoints import auth, vehicles, logs, notifications, stats, cameras, stream, detection, camera_server
@@ -31,20 +31,7 @@ app.add_middleware(
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-class LimitUploadSize(BaseHTTPMiddleware):
-    def __init__(self, app, max_upload_size: int) -> None:
-        super().__init__(app)
-        self.max_upload_size = max_upload_size
-
-    async def dispatch(self, request: Request, call_next):
-        if request.method == 'PUT' or request.method == 'POST':
-            if request.headers.get('content-length'):
-                content_length = int(request.headers.get('content-length'))
-                if content_length > self.max_upload_size:
-                    raise HTTPException(status_code=413, detail="Payload too large")
-        return await call_next(request)
-
-app.add_middleware(LimitUploadSize, max_upload_size=50_000_000) # 50MB
+# Optional: Add safe middleware here if needed in future
 
 # Ensure required directories exist (Absolute Path)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -87,8 +74,6 @@ if RFID_AVAILABLE:
 @app.get("/")
 def read_root():
     return {"message": "IntelliAccess Backend is running!"}
-
-# Trigger reload
 
 if __name__ == "__main__":
     import uvicorn
