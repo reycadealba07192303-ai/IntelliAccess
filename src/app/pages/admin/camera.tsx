@@ -261,7 +261,8 @@ const CameraPage = () => {
                                 if (clearTimer) clearTimeout(clearTimer);
                                 clearTimer = setTimeout(() => {
                                     if (isMounted) {
-                                        setDetectionResult(null);
+                                        // Prevent history from disappearing
+                                        // setDetectionResult(null);
                                         setScanStatus('idle');
                                     }
                                 }, 5000);
@@ -270,7 +271,7 @@ const CameraPage = () => {
                             setScanStatus('idle');
                             // Only clear result if it's not a fresh log being displayed
                             if (!lastScanIdRef.current || lastScanIdRef.current.startsWith('live_')) {
-                                setDetectionResult(null);
+                                // setDetectionResult(null);
                             }
                         }
                     } catch (err) {
@@ -402,7 +403,8 @@ const CameraPage = () => {
                                 
                                 setTimeout(() => {
                                     if (isMounted) {
-                                        setDetectionResult(null);
+                                        // Prevent history from disappearing
+                                        // setDetectionResult(null);
                                         setScanStatus('idle');
                                     }
                                 }, 5000);
@@ -410,7 +412,7 @@ const CameraPage = () => {
                         } else if (isMounted) {
                             // If no plate, gracefully clear out old plate if it expired
                             setScanStatus('idle');
-                            setDetectionResult(null);
+                            // setDetectionResult(null);
                         }
                     } catch (err: any) {
                         console.error("Local webcam detect error:", err);
@@ -490,7 +492,8 @@ const CameraPage = () => {
                         // Reset UI after 5 seconds
                         setTimeout(() => {
                             if (isMounted) {
-                                setDetectionResult(null);
+                                // Prevent history from disappearing
+                                // setDetectionResult(null);
                                 setScanStatus('idle');
                             }
                         }, 5000);
