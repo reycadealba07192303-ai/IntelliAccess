@@ -20,7 +20,7 @@ rfid_polling_active = False       # Whether background thread is running
 LOG_COOLDOWN_SECONDS = 30         # Same cooldown as Camera module
 
 class RFIDReader:
-    def __init__(self, port: str = '/dev/ttyUSB0', baudrate: int = 9600):
+    def __init__(self, port: str = '/dev/serial0', baudrate: int = 9600):
         """
         Initialize RFID reader
         Args:
