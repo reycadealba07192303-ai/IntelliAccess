@@ -14,7 +14,7 @@ const piUrl = import.meta.env.VITE_PI_API_URL;
 const apiUrl = import.meta.env.VITE_API_URL;
 
 // Force production URL if running on Vercel and env vars are missing
-const isVercel = window.location.hostname.includes("vercel.app");
+const isVercel = typeof window !== 'undefined' && window.location.hostname.includes("vercel.app");
 const PRODUCTION_URL = "https://api.intelliaccess.online";
 
 // If we have a Pi URL (especially an Ngrok one), prioritize it as it's our hardware backend
