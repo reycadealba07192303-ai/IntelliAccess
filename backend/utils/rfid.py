@@ -184,9 +184,9 @@ def _process_rfid_tag(tag_id: str):
         # [STRICT VALIDATION] If not registered, we ignore it to prevent noise
         # But we still log it once as "Denied" for security visibility if requested
         if not vehicle:
-            print(f"[RFID] Ignoring unregistered tag: {tag_id}")
+            print(f"[RFID] Unregistered tag detected: {tag_id}. Updating shared state for registration UI.")
             
-            # Log as unregistered event but don't trigger buzzer or shared state
+            # Log as unregistered event
             log_data = {
                 "plate_detected": "Unregistered RFID",
                 "rfid_tag": tag_id,
@@ -198,6 +198,17 @@ def _process_rfid_tag(tag_id: str):
                 "image_url": None
             }
             denied_logs_collection.insert_one(log_data)
+            
+            # [FIX] Update shared state so registration UI can see this new tag
+            latest_rfid_scan = {
+                "timestamp": current_time,
+                "plate_number": "Unregistered Tag",
+                "rfid_tag": tag_id,
+                "access_granted": False,
+                "access_status": "DENIED (UNREGISTERED)",
+                "vehicle_info": None,
+                "method": "RFID"
+            }
             return
 
         # If we reach here, the vehicle IS registered
