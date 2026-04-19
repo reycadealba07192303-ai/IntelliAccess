@@ -61,22 +61,7 @@ const LogsPage = () => {
       const gate = log.gate?.replace('_', ' ') || "Unknown";
       const key = `${plate}-${dateStr}`;
 
-      if (log.action === 'Entry' || log.action === 'ENTRY') {
-        if (!openSessions[key]) {
-          openSessions[key] = {
-            id: log.id,
-            plate: plate,
-            gate: gate,
-            status: log.status,
-            date: dateStr,
-            time_in: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            time_out: "--",
-            created_at: log.created_at,
-            vehicle: log.vehicle,
-            image_url: log.image_url
-          };
-        }
-      } else if (log.action === 'Exit' || log.action === 'EXIT') {
+      if (log.action === 'Exit' || log.action === 'EXIT') {
         if (openSessions[key]) {
           openSessions[key].time_out = new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           sessions.push(openSessions[key]);
@@ -94,6 +79,34 @@ const LogsPage = () => {
             vehicle: log.vehicle,
             image_url: log.image_url
           });
+        }
+      } else if (log.status === 'DENIED' || log.action === 'Attempt' || log.plate_detected === 'Unregistered RFID') {
+        sessions.push({
+          id: log.id,
+          plate: plate,
+          gate: gate,
+          status: log.status,
+          date: dateStr,
+          time_in: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time_out: "--",
+          created_at: log.created_at,
+          vehicle: log.vehicle,
+          image_url: log.image_url
+        });
+      } else {
+        if (!openSessions[key]) {
+          openSessions[key] = {
+            id: log.id,
+            plate: plate,
+            gate: gate,
+            status: log.status,
+            date: dateStr,
+            time_in: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time_out: "--",
+            created_at: log.created_at,
+            vehicle: log.vehicle,
+            image_url: log.image_url
+          };
         }
       }
     });
