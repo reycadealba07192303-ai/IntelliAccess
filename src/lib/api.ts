@@ -13,8 +13,16 @@ const localUrl = import.meta.env.VITE_LOCAL_API_URL || DEFAULT_LOCAL_API_URL;
 const piUrl = import.meta.env.VITE_PI_API_URL;
 const apiUrl = import.meta.env.VITE_API_URL;
 
+// Force production URL if running on Vercel and env vars are missing
+const isVercel = window.location.hostname.includes("vercel.app");
+const PRODUCTION_URL = "https://api.intelliaccess.online";
+
 // If we have a Pi URL (especially an Ngrok one), prioritize it as it's our hardware backend
-const finalUrl = (piUrl && piUrl.includes("ngrok")) ? piUrl : (apiUrl || piUrl || DEFAULT_LOCAL_API_URL);
+let finalUrl = (piUrl && piUrl.includes("ngrok")) ? piUrl : (apiUrl || piUrl || DEFAULT_LOCAL_API_URL);
+
+if (isVercel && !apiUrl) {
+    finalUrl = PRODUCTION_URL;
+}
 
 /**
  * Ensures that Ngrok URLs use HTTPS to avoid Mixed Content errors on Vercel.
