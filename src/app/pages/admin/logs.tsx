@@ -4,6 +4,8 @@ import { Search, Calendar, MapPin, Download, Eye } from "lucide-react";
 import { useNotification } from "../../context/NotificationContext";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { NgrokImage } from "../../components/figma/NgrokImage";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface AccessLog {
   id: number;
@@ -187,6 +189,62 @@ const LogsPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handlePdfExport = () => {
+    if (filteredLogs.length === 0) {
+      showNotification("No logs available to export.", "warning");
+      return;
+    }
+
+    showNotification("Generating PDF report...", "info");
+
+    const doc = new jsPDF();
+    const tableColumn = ["Plate Number", "User Role", "Gate", "Date", "Time In", "Time Out", "Status"];
+    const tableRows: any[] = [];
+
+    filteredLogs.forEach(session => {
+      const role = session.vehicle?.owner?.role || "GUEST";
+      const displayRole = role.charAt(0) + role.slice(1).toLowerCase();
+      
+      const logData = [
+        session.plate,
+        displayRole,
+        session.gate,
+        session.date,
+        session.time_in,
+        session.time_out,
+        session.status === "GRANTED" ? "Authorized" : session.status
+      ];
+      tableRows.push(logData);
+    });
+
+    // Header styling
+    doc.setFontSize(18);
+    doc.setTextColor(22, 160, 133);
+    doc.text("IntelliAccess - Vehicle History Report", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Total Records: ${filteredLogs.length}`, 14, 35);
+    
+    if (dateFilter) {
+      doc.text(`Filtered Date: ${new Date(dateFilter).toLocaleDateString()}`, 14, 40);
+    }
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 245, 245] }
+    });
+
+    doc.save(`IntelliAccess_History_${new Date().toISOString().split('T')[0]}.pdf`);
+    showNotification("PDF Report Downloaded", "success");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -204,9 +262,15 @@ const LogsPage = () => {
           </button>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10 transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
+          </button>
+          <button
+            onClick={handlePdfExport}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+          >
+            <Download className="h-4 w-4" /> Download PDF
           </button>
         </div>
       </div>

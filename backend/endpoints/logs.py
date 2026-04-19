@@ -47,7 +47,7 @@ def create_log(log: AccessLogCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("")
-def get_logs(limit: int = 100, offset: int = 0, owner_id: Optional[str] = None, user = Depends(get_current_user)):
+def get_logs(limit: int = 10000, offset: int = 0, owner_id: Optional[str] = None, user = Depends(get_current_user)):
     try:
         from bson import ObjectId
         from mongo_client import vehicles_collection, users_collection, denied_logs_collection
