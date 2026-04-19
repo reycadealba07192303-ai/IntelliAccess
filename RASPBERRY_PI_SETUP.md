@@ -212,6 +212,9 @@ Create systemd service files to auto-start on boot.
 sudo nano /etc/systemd/system/intelliaccess-backend.service
 ```
 
+> **STOP! IMPORTANT CAUTION 🛑:** 
+> Find out your exact username (e.g., `intelliaacess`). Do **NOT** just copy `pi` if your username is different! Replace EVERY instance of `pi` below with your real username (e.g. `User=intelliaacess`, `/home/intelliaacess/`).
+
 ```ini
 [Unit]
 Description=IntelliAccess Backend
@@ -219,9 +222,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/IntelliAccess/backend
-ExecStart=/home/pi/IntelliAccess/backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+User=intelliaacess
+WorkingDirectory=/home/intelliaacess/IntelliAccess/backend
+ExecStart=/home/intelliaacess/IntelliAccess/backend/venv/bin/python main.py
 Restart=always
 RestartSec=10
 
@@ -241,8 +244,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/IntelliAccess
+User=intelliaacess
+WorkingDirectory=/home/intelliaacess/IntelliAccess
 ExecStart=/usr/bin/npm run dev
 Restart=always
 RestartSec=10
