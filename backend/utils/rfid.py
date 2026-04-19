@@ -178,8 +178,11 @@ def _process_rfid_tag(tag_id: str):
         return
 
     try:
-        # Look up vehicle by rfid_tag field
-        vehicle = vehicles_collection.find_one({"rfid_tag": tag_id})
+        # Look up vehicle by rfid_tag field (Case-insensitive and stripped)
+        clean_tag = tag_id.strip()
+        vehicle = vehicles_collection.find_one({
+            "rfid_tag": {"$regex": f"^{clean_tag}$", "$options": "i"}
+        })
     
         # [STRICT VALIDATION] If not registered, we ignore it to prevent noise
         # But we still log it once as "Denied" for security visibility if requested
