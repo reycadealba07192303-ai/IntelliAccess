@@ -190,7 +190,6 @@ const CameraPage = () => {
     // --- Backend-Driven Camera & AI Polling ---
     useEffect(() => {
         let scanInterval: NodeJS.Timeout;
-        let clearTimer: NodeJS.Timeout;
         let streamInterval: NodeJS.Timeout;
         let isMounted = true;
 
@@ -263,14 +262,6 @@ const CameraPage = () => {
                                     toast.error(`Denied: ${data.plate_number}`);
                                 }
 
-                                if (clearTimer) clearTimeout(clearTimer);
-                                clearTimer = setTimeout(() => {
-                                    if (isMounted) {
-                                        // Prevent history from disappearing
-                                        // setDetectionResult(null);
-                                        setScanStatus('idle');
-                                    }
-                                }, 5000);
                             }
                         } else {
                             setScanStatus('idle');
@@ -298,7 +289,6 @@ const CameraPage = () => {
             isMounted = false;
             if (scanInterval) clearInterval(scanInterval);
             if (streamInterval) clearInterval(streamInterval);
-            if (clearTimer) clearTimeout(clearTimer);
         };
     }, [selectedCamera, isAutoScanning]);
 
@@ -405,14 +395,6 @@ const CameraPage = () => {
                                 } else {
                                     toast.error(`Denied (Webcam): ${res.plate_number}`);
                                 }
-                                
-                                setTimeout(() => {
-                                    if (isMounted) {
-                                        // Prevent history from disappearing
-                                        // setDetectionResult(null);
-                                        setScanStatus('idle');
-                                    }
-                                }, 5000);
                             }
                         } else if (isMounted) {
                             // If no plate, gracefully clear out old plate if it expired
@@ -493,15 +475,6 @@ const CameraPage = () => {
                         } else {
                             toast.error(`RFID Tag Denied: ${scanData.plate_number || scanData.rfid_tag}`);
                         }
-
-                        // Reset UI after 5 seconds
-                        setTimeout(() => {
-                            if (isMounted) {
-                                // Prevent history from disappearing
-                                // setDetectionResult(null);
-                                setScanStatus('idle');
-                            }
-                        }, 5000);
                     }
                 }
             } catch (err) {
@@ -600,6 +573,17 @@ const CameraPage = () => {
             if (brainInterval) clearInterval(brainInterval);
         };
     }, [selectedCamera, isAutoScanning, isBrainMode]);
+
+    // --- Auto-clear Detection Results after 5 seconds ---
+    useEffect(() => {
+        if (detectionResult) {
+            const timer = setTimeout(() => {
+                setDetectionResult(null);
+                setScanStatus('idle');
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [detectionResult]);
 
     return (
         <motion.div
