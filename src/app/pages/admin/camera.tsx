@@ -208,12 +208,17 @@ const CameraPage = () => {
                     
                     const secureTarget = getSecureUrl(targetUrl);
 
+                    const token = localStorage.getItem('access_token');
                     const res = await fetch(secureTarget, {
-                        headers: { 'ngrok-skip-browser-warning': 'true' },
+                        headers: { 
+                            'ngrok-skip-browser-warning': 'true',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                        },
                         cache: 'no-store'
                     });
                     if (res.ok) {
                         const blob = await res.blob();
+                        // console.log("[DEBUG] Snapshot Blob Size:", blob.size);
                         if (blob.size > 100) { // >100 bytes means actual JPEG data, not empty
                             const newUrl = URL.createObjectURL(blob);
                             setStreamSrc(newUrl);

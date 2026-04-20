@@ -31,8 +31,9 @@ export function getSecureUrl(url: string | undefined) {
     if (!url) return "";
     let secureUrl = url;
     
-    // Auto-upgrade ngrok to https to prevent Mixed Content errors on Vercel
-    if (url.includes("ngrok") && url.startsWith("http://")) {
+    // Auto-upgrade to https if running on a secure context (Vercel) to prevent Mixed Content errors
+    const isPageSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    if (isPageSecure && url.startsWith("http://")) {
         secureUrl = url.replace("http://", "https://");
     }
     
