@@ -197,16 +197,19 @@ def log_plate_detection(plate_text: str, frame=None):
                 last_log_time_str = last_log.get("timestamp")
                 if last_log_time_str:
                     try:
-                        last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
                         
-                        if -1.0 < time_diff < 0.5:
-                            print(f"[DEBUG COOLDOWN] Race condition ({time_diff:.3f}s). Ignoring.", flush=True)
+                        # RACE CONDITION PROTECTION
+                        # If diff is extremely tiny (between -0.5s and 0.5s), it's a parallel request.
+                        # We ignore it to prevent double-logging.
+                        if abs(time_diff) < 0.5:
+                            print(f"[DEBUG COOLDOWN] Race condition ({time_diff:.3f}s). Ignoring redundant parallel thread.", flush=True)
                             action = "Ignored"
                         elif 0.5 <= time_diff < LOG_COOLDOWN_SECONDS:
                             print(f"[STREAM DETECT] Cooldown Active ({time_diff:.1f}s ago).", flush=True)
                             action = "Ignored"
                         else:
+                            # State change only if time_diff is significant
                             action = "Exit" if last_log_action == "Entry" else "Entry"
                             print(f"[DEBUG COOLDOWN] Valid State Change: {action} (Last was {time_diff:.1f}s ago)", flush=True)
                     except Exception as e:
