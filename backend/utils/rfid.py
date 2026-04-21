@@ -6,8 +6,10 @@ except ImportError:
 
 import time
 import threading
+import re
 from typing import Optional
 from datetime import datetime
+from utils.config_state import get_config
 from utils.access_utils import is_on_cooldown, set_cooldown, trigger_hardware_success, trigger_hardware_denied, trigger_hardware_restricted
 
 # ─── Shared State (used by both Camera AI and RFID modules) ───────────────────
@@ -148,6 +150,10 @@ def _process_rfid_tag(tag_id: str):
     Same deduplication logic as camera module.
     """
     global latest_rfid_scan, rfid_last_tag
+    
+    # Check if RFID scanning is globally disabled
+    if not get_config().get("rfid_scanning_active", True):
+        return
 
     # Import here to avoid circular imports
     try:
@@ -178,8 +184,9 @@ def _process_rfid_tag(tag_id: str):
         return
 
     try:
-        # Look up vehicle by rfid_tag field (Case-insensitive and stripped)
-        clean_tag = tag_id.strip()
+        # [ROBUST MATCHING] Remove all non-alphanumeric characters and strip
+        clean_tag = re.sub(r'[^a-zA-Z0-9]', '', tag_id).strip()
+        
         vehicle = vehicles_collection.find_one({
             "rfid_tag": {"$regex": f"^{clean_tag}$", "$options": "i"}
         })
@@ -189,21 +196,13 @@ def _process_rfid_tag(tag_id: str):
         if not vehicle:
             print(f"[RFID] Unregistered tag detected: {tag_id}. Updating shared state for registration UI.")
             
-            # Log as unregistered event
-            log_data = {
-                "plate_detected": "Unregistered RFID",
-                "rfid_tag": tag_id,
-                "action": "Attempt",
-                "status": "DENIED",
-                "gate": "Main Gate Entry",
-                "method": "RFID",
-                "timestamp": datetime.now().isoformat(),
-                "image_url": None
-            }
-            denied_logs_collection.insert_one(log_data)
+            # Log as unregistered event (DEACTIVATED TO PREVENT NOISE)
+            # denied_logs_collection.insert_one(log_data)
+            print(f"[RFID] Unregistered noise filtered. DB entry skipped.")
             
             # [FIX] Update shared state so registration UI can see this new tag
             latest_rfid_scan = {
+                "id": f"rfid_scan_{int(current_time)}",
                 "timestamp": current_time,
                 "plate_number": "Unregistered Tag",
                 "rfid_tag": tag_id,
@@ -365,15 +364,15 @@ def _process_rfid_tag(tag_id: str):
         print(f"[RFID] Logged Tag: {tag_id} | Vehicle: {vehicle_info.get('plate_number', 'Unknown')} | Status: {status}")
 
         # Update shared scan state (frontend polls /rfid/latest-scan)
+        # Update frontend polling object
         latest_rfid_scan = {
-            "id": log_entry_id,
+            "id": f"rfid_scan_{int(current_time)}",
             "timestamp": current_time,
-            "plate_number": vehicle_info.get("plate_number", tag_id),
+            "plate_number": vehicle_info.get("plate_number", "Unknown"),
             "rfid_tag": tag_id,
             "access_granted": status == "Authorized",
             "access_status": "GRANTED" if status == "Authorized" else status.upper(),
             "vehicle_info": vehicle_info,
-            "image_url": None,
             "method": "RFID"
         }
 
@@ -390,6 +389,14 @@ def _background_polling_loop(reader: 'RFIDReader'):
     print("[RFID] Background polling started.")
     while rfid_polling_active:
         try:
+            # ─── AUTO-CLEAR OLD RESULTS ───
+            # Clear newest result if more than 10 seconds old
+            global latest_rfid_scan
+            if latest_rfid_scan and time.time() - latest_rfid_scan.get("timestamp", 0) > 10:
+                latest_rfid_scan = None
+                print("[RFID] Shared state auto-cleared (timeout).")
+
+            # Poll and process...
             tag = reader.read_tag()
             if tag:
                 print(f"[RFID] Tag detected: {tag}")

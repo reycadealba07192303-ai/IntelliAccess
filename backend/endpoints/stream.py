@@ -4,6 +4,7 @@ import threading
 import time
 import os
 from datetime import datetime
+from utils.config_state import get_config
 
 # Optional imports for AI and Camera
 try:
@@ -513,7 +514,7 @@ def camera_background_task():
             latest_frame_raw = frame.copy() if frame is not None else None
 
             # Run detection every DETECTION_INTERVAL frames
-            if frame_counter % DETECTION_INTERVAL == 0:
+            if get_config().get("camera_scanning_active", True) and frame_counter % DETECTION_INTERVAL == 0:
                 current_detections = []
                 
                 # 1. Run YOLOv8 on the frame (general object detection)
@@ -604,6 +605,10 @@ def _ocr_background_worker():
         try:
             # Wait for an ROI image to appear in the queue
             frame, roi = ocr_queue.get(timeout=1)
+            
+            # Check if camera scanning is globally disabled
+            if not get_config().get("camera_scanning_active", True):
+                continue
             
             # Step 1: Small resize for motion detection (speed up)
             roi_small = cv2.resize(roi, (100, 100))

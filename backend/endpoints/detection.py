@@ -2,8 +2,18 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import os
 import time
 from datetime import datetime
+from utils.config_state import get_config, save_config
 
 router = APIRouter()
+
+@router.get("/system/config")
+async def get_system_config():
+    return get_config()
+
+@router.post("/system/config")
+async def update_system_config(config: dict):
+    save_config(config)
+    return {"message": "Config updated", "config": get_config()}
 
 import platform
 import re

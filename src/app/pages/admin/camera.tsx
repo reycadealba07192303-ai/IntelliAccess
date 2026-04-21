@@ -8,13 +8,16 @@ import {
     Radio,
     CheckCircle2,
     XCircle,
-    Trash2,
-    X,
-    Tag,
+    Activity,
+    Loader2,
+    Sliders,
+    ChevronDown,
+    Shield,
     Camera,
     Cpu,
-    Activity,
-    Loader2
+    Tag,
+    Trash2,
+    X
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch, API_BASE_URL, getSecureUrl } from "@/lib/api";
@@ -38,6 +41,46 @@ const CameraPage = () => {
     const [scanCount, setScanCount] = useState(0);
     const lastScanTimeRef = useRef<number>(0);
     const [lastScanStatusRef] = useState<'idle' | 'granted' | 'denied'>('idle');
+
+    // System Hardware Config State
+    interface SystemConfig {
+        camera_scanning_active: boolean;
+        rfid_scanning_active: boolean;
+        brain_mode_active: boolean;
+        [key: string]: boolean;
+    }
+
+    const [systemConfig, setSystemConfig] = useState<SystemConfig>({
+        camera_scanning_active: true,
+        rfid_scanning_active: true,
+        brain_mode_active: true
+    });
+    const [isControlsOpen, setIsControlsOpen] = useState(false);
+
+    const fetchSystemConfig = async () => {
+        try {
+            const config = await apiFetch("/system/config");
+            setSystemConfig(config);
+            setIsBrainMode(config.brain_mode_active);
+        } catch (err) {
+            console.error("Failed to fetch system config:", err);
+        }
+    };
+
+    const toggleSystemConfig = async (key: string) => {
+        const newConfig = { ...systemConfig, [key]: !systemConfig[key] };
+        try {
+            await apiFetch("/system/config", {
+                method: "POST",
+                body: JSON.stringify(newConfig)
+            });
+            setSystemConfig(newConfig);
+            if (key === 'brain_mode_active') setIsBrainMode(!systemConfig.brain_mode_active);
+            toast.success(`${key.replace(/_/g, ' ').toUpperCase()} updated`);
+        } catch (err) {
+            toast.error("Failed to update hardware setting");
+        }
+    };
 
     // Diagnostic State
     const [isDiagOpen, setIsDiagOpen] = useState(false);
@@ -71,6 +114,7 @@ const CameraPage = () => {
 
     useEffect(() => {
         fetchCameras();
+        fetchSystemConfig();
     }, []);
 
     const handleAddCamera = async () => {
@@ -580,7 +624,7 @@ const CameraPage = () => {
             const timer = setTimeout(() => {
                 setDetectionResult(null);
                 setScanStatus('idle');
-            }, 5000);
+            }, 4000); // Reduced to 4 seconds
             return () => clearTimeout(timer);
         }
     }, [detectionResult]);
@@ -606,43 +650,103 @@ const CameraPage = () => {
                     <p className="text-slate-400">Real-time monitoring and security feeds.</p>
                 </div>
                 
-                <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => setIsBrainMode(!isBrainMode)}
-                        className={`group relative flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-                            isBrainMode 
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
-                            : "bg-slate-800/50 border-white/5 text-slate-400 grayscale"
-                        }`}
-                    >
-                        <div className={`p-1 rounded-lg ${isBrainMode ? "bg-emerald-500/20" : "bg-slate-700"}`}>
-                            <Cpu className="h-4 w-4" />
-                        </div>
-                        <div className="flex flex-col items-start leading-none gap-1">
-                            <span className="text-xs font-bold uppercase tracking-wider">AI Brain Mode</span>
-                            <span className="text-[8px] opacity-60 font-medium whitespace-nowrap">Offload to PC (Accuracy: High)</span>
-                        </div>
-                    </button>
-                    
-                    <button
-                        onClick={runDiagnostics}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all font-bold text-xs"
-                    >
-                        <Activity className="h-4 w-4" />
-                        DIAGNOSTICS
-                    </button>
-                    
-                    <button
-                        onClick={toggleAutoScan}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all ${
-                            isAutoScanning
-                                ? "bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]"
-                                : "bg-slate-800 text-slate-400 border border-white/5"
-                        }`}
-                    >
-                        <div className={`h-2 w-2 rounded-full ${isAutoScanning ? "bg-black animate-pulse" : "bg-slate-600"}`} />
-                        {isAutoScanning ? "SCANNERS ACTIVE" : "ENABLE SCANNERS"}
-                    </button>
+                <div className="flex items-center gap-4 relative">
+                    <div className="relative">
+                        <button 
+                            onClick={() => setIsControlsOpen(!isControlsOpen)}
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all font-bold text-xs uppercase tracking-widest ${
+                                isControlsOpen 
+                                ? "bg-white text-black border-white" 
+                                : "bg-slate-800/50 border-white/10 text-white hover:bg-slate-800"
+                            }`}
+                        >
+                            <Sliders className="h-4 w-4" />
+                            Scanning Settings
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isControlsOpen ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {isControlsOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsControlsOpen(false)} />
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    className="absolute right-0 mt-2 w-72 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                                >
+                                    <div className="p-2 space-y-1">
+                                        <div className="px-3 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Hardware Switches</div>
+                                        
+                                        <button 
+                                            onClick={() => toggleSystemConfig('camera_scanning_active')}
+                                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${systemConfig.camera_scanning_active ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"}`}>
+                                                    <Camera className="h-4 w-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-bold text-white">Camera AI</div>
+                                                    <div className="text-[10px] text-slate-500">Real-time Plate Scanning</div>
+                                                </div>
+                                            </div>
+                                            <div className={`h-5 w-9 rounded-full relative transition-colors ${systemConfig.camera_scanning_active ? "bg-emerald-500" : "bg-slate-700"}`}>
+                                                <div className={`absolute top-1 h-3 w-3 bg-white rounded-full transition-all ${systemConfig.camera_scanning_active ? "right-1" : "left-1"}`} />
+                                            </div>
+                                        </button>
+
+                                        <button 
+                                            onClick={() => toggleSystemConfig('rfid_scanning_active')}
+                                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${systemConfig.rfid_scanning_active ? "bg-blue-500/20 text-blue-400" : "bg-slate-800 text-slate-500"}`}>
+                                                    <Radio className="h-4 w-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-bold text-white">RFID Hardware</div>
+                                                    <div className="text-[10px] text-slate-500">Card & Tag Processing</div>
+                                                </div>
+                                            </div>
+                                            <div className={`h-5 w-9 rounded-full relative transition-colors ${systemConfig.rfid_scanning_active ? "bg-blue-500" : "bg-slate-700"}`}>
+                                                <div className={`absolute top-1 h-3 w-3 bg-white rounded-full transition-all ${systemConfig.rfid_scanning_active ? "right-1" : "left-1"}`} />
+                                            </div>
+                                        </button>
+
+                                        <div className="my-2 border-t border-white/5" />
+                                        <div className="px-3 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Brain Configuration</div>
+
+                                        <button 
+                                            onClick={() => toggleSystemConfig('brain_mode_active')}
+                                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${systemConfig.brain_mode_active ? "bg-purple-500/20 text-purple-400" : "bg-slate-800 text-slate-500"}`}>
+                                                    <Cpu className="h-4 w-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-bold text-white">AI Brain Mode</div>
+                                                    <div className="text-[10px] text-slate-500">Offload to PC (High Accuracy)</div>
+                                                </div>
+                                            </div>
+                                            <div className={`h-5 w-9 rounded-full relative transition-colors ${systemConfig.brain_mode_active ? "bg-purple-500" : "bg-slate-700"}`}>
+                                                <div className={`absolute top-1 h-3 w-3 bg-white rounded-full transition-all ${systemConfig.brain_mode_active ? "right-1" : "left-1"}`} />
+                                            </div>
+                                        </button>
+
+                                        <button 
+                                            onClick={() => { runDiagnostics(); setIsControlsOpen(false); }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors text-blue-400"
+                                        >
+                                            <div className="p-2 rounded-lg bg-blue-500/20">
+                                                <Activity className="h-4 w-4" />
+                                            </div>
+                                            <div className="text-xs font-bold">Launch Diagnostics</div>
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

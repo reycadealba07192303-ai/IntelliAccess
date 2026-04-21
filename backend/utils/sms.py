@@ -1,8 +1,12 @@
 import os
 import requests
 import threading
-
+import time
 from mongo_client import log_notification
+
+# Cooldown to prevent spamming the same number (in seconds)
+_sms_cooldowns = {}
+SMS_COOLDOWN_LIMIT = 45 # 45 seconds between messages to same number
 
 # Use the API Key previously provided by the user
 SMS_API_PH_KEY = os.getenv("SMS_API_PH_KEY", "sk-2b10vkgzpm562uaxjjjyh6yaenufhlvl")
@@ -15,6 +19,16 @@ def _send_sms_thread(phone_number: str, message: str, owner_name: str = "Owner")
     if not phone_number or len(phone_number) < 10:
         print(f"[SMS WARNING] Invalid or missing phone number: '{phone_number}'")
         return
+
+    # [COOLDOWN CHECK] Prevent spamming
+    current_time = time.time()
+    if phone_number in _sms_cooldowns:
+        elapsed = current_time - _sms_cooldowns[phone_number]
+        if elapsed < SMS_COOLDOWN_LIMIT:
+            print(f"[SMS COOLDOWN] SMS to {phone_number} skipped. Only {elapsed:.1f}s elapsed.")
+            return
+            
+    _sms_cooldowns[phone_number] = current_time
 
     # Ensure it's in the +639... format as per documentation
     cleaned_phone = phone_number.replace(" ", "").replace("-", "").replace("+", "")
