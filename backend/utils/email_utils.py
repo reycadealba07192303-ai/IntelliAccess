@@ -11,6 +11,10 @@ load_dotenv()
 GMAIL_USER = os.getenv("GMAIL_USER", "intelliaccessssu@gmail.com")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 
+# Strip spaces from password if it exists
+if GMAIL_APP_PASSWORD:
+    GMAIL_APP_PASSWORD = GMAIL_APP_PASSWORD.replace(" ", "").strip()
+
 def _send_email_thread(recipient_email, subject, body_text, body_html):
     """
     Internal function to send email via Gmail SMTP.
