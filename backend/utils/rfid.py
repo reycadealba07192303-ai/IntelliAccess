@@ -217,6 +217,7 @@ def _process_rfid_tag(tag_id: str):
         status = "Denied"
         vehicle_info = None
         owner_phone = None
+        owner_email = None
 
         vehicle["id"] = str(vehicle["_id"])
         del vehicle["_id"]
@@ -241,9 +242,10 @@ def _process_rfid_tag(tag_id: str):
                 owner_doc = users_collection.find_one({"_id": o_query_id})
                 if owner_doc:
                     owner_phone = owner_doc.get("phone")
+                    owner_email = owner_doc.get("email")
                     if "owner_name" not in vehicle_info:
                         vehicle_info["owner_name"] = owner_doc.get("name", "Unknown")
-                    print(f"[RFID-SMS-DEBUG] Owner found: {vehicle_info['owner_name']}, Phone: {owner_phone}")
+                    print(f"[RFID-SYNC-DEBUG] Owner: {vehicle_info['owner_name']}, Phone: {owner_phone}, Email: {owner_email}")
                 else:
                     print(f"[RFID-SMS-DEBUG] Owner ID {o_id} not found in users collection.")
             except Exception as ex:
@@ -360,6 +362,22 @@ def _process_rfid_tag(tag_id: str):
                     print(f"[RFID] SMS error: {e}")
             else:
                 print(f"[RFID] SMS skipped: No phone number found for owner of vehicle {vehicle_info.get('plate_number')}")
+
+            if owner_email:
+                try:
+                    from utils.email_utils import send_access_email
+                    print(f"[RFID] Triggering {action} Email to {owner_email} for vehicle {vehicle_info.get('plate_number')}")
+                    send_access_email(
+                        recipient_email=owner_email,
+                        owner_name=vehicle_info.get("owner_name", "Unknown"),
+                        plate_number=vehicle_info.get("plate_number", tag_id),
+                        time_str=current_time_str,
+                        action=action
+                    )
+                except Exception as e:
+                    print(f"[RFID] Email error: {e}")
+            else:
+                print(f"[RFID] Email skipped: No email address found for owner of vehicle {vehicle_info.get('plate_number')}")
 
         print(f"[RFID] Logged Tag: {tag_id} | Vehicle: {vehicle_info.get('plate_number', 'Unknown')} | Status: {status}")
 

@@ -86,6 +86,7 @@ CAPTURES_DIR = os.path.join(BASE_DIR, "static", "captures")
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 
 from utils.sms import send_access_sms
+from utils.email_utils import send_access_email
 try:
     from utils.buzzer import buzz_granted, buzz_denied
     BUZZER_AVAILABLE = True
@@ -228,14 +229,16 @@ def log_plate_detection(plate_text: str, frame=None):
         # Check last action for this vehicle to determine Entry vs Exit
         action = "Entry"
         owner_phone = None
+        owner_email = None
         if vehicle_info:
             
-            # Fetch the actual user document to get the phone number
+            # Fetch the actual user document to get the phone number and email
             if vehicle_info.get("owner_id"):
                 from bson import ObjectId
                 owner_doc = users_collection.find_one({"_id": ObjectId(vehicle_info["owner_id"])})
                 if owner_doc:
                     owner_phone = owner_doc.get("phone")
+                    owner_email = owner_doc.get("email")
             
             last_log = access_logs_collection.find_one(
                 {"vehicle_id": vehicle_info.get("id")},
@@ -318,6 +321,19 @@ def log_plate_detection(plate_text: str, frame=None):
                         )
                     else:
                         print(f"[STREAM DETECT] SMS skipped for {plate_text}: No phone number found for owner {owner_name}")
+                        
+                    if owner_email:
+                        # Send Email for both Entry and Exit
+                        print(f"[STREAM DETECT] Triggering {action} Email to {owner_name} ({owner_email}) for plate {plate_text}")
+                        send_access_email(
+                            recipient_email=owner_email,
+                            owner_name=owner_name,
+                            plate_number=plate_text,
+                            time_str=current_time_str,
+                            action=action
+                        )
+                    else:
+                        print(f"[STREAM DETECT] Email skipped for {plate_text}: No email address found for owner {owner_name}")
                 # --- END SMS INTEGRATION ---
             else:
                 status = "Cooldown Active"
