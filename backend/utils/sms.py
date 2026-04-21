@@ -6,7 +6,7 @@ from mongo_client import log_notification
 
 # Cooldown to prevent spamming the same number (in seconds)
 _sms_cooldowns = {}
-SMS_COOLDOWN_LIMIT = 45 # 45 seconds between messages to same number
+SMS_COOLDOWN_LIMIT = 30 # Reduced to 30 seconds
 
 # Use the API Key previously provided by the user
 SMS_API_PH_KEY = os.getenv("SMS_API_PH_KEY", "sk-2b10vkgzpm562uaxjjjyh6yaenufhlvl")

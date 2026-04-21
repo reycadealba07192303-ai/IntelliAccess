@@ -273,6 +273,7 @@ def log_plate_detection(plate_text: str, frame=None):
             if action != "Ignored":
                 log_data = {
                     "plate_detected": plate_text,
+                    "rfid_tag": vehicle_info.get("rfid_tag") if vehicle_info else None,
                     "action": action, 
                     "status": "GRANTED" if status == "Authorized" else "DENIED",
                     "gate": "Main Gate Entry",
