@@ -166,8 +166,8 @@ def log_plate_detection(plate_text: str, frame=None):
                 print(f"[STREAM DETECT] AI OCR '{search_plate}' fuzzy matched to DB '{best_match.get('plate_number')}' (ratio {highest_ratio:.2f})")
         
         if vehicle:
+            # Ensure we have a string ID for cooldowns and logging
             vehicle["id"] = str(vehicle["_id"])
-            del vehicle["_id"]
             vehicle_info = vehicle
             
             # Additional layer to guarantee we grab the right owner details
@@ -188,7 +188,7 @@ def log_plate_detection(plate_text: str, frame=None):
                 status = "Authorized"
             
             # Check for Vehicle-ID based cooldown
-            vehicle_id = str(vehicle["_id"])
+            vehicle_id = vehicle["id"]
             if is_on_cooldown(vehicle_id):
                 print(f"[STREAM] Ignoring {plate_text} - recently logged via ID {vehicle_id}")
                 return
