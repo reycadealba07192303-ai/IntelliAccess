@@ -219,8 +219,8 @@ def _process_rfid_tag(tag_id: str):
         owner_phone = None
         owner_email = None
 
-        # Ensure we have a string ID for cooldowns and logging
-        vehicle["id"] = str(vehicle["_id"])
+        # Ensure we have a string 'id' for cooldowns/logging without deleting original '_id'
+        vehicle["id"] = str(vehicle.get("_id", "unknown"))
         vehicle_info = vehicle
 
         v_status = vehicle.get("status", "").strip().upper()
