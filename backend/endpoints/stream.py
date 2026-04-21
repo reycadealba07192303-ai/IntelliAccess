@@ -111,19 +111,17 @@ def log_plate_detection(plate_text: str, frame=None):
             return
             
         current_time = time.time()
-        
-        # Cooldown logic (Quick check by plate text first)
-        if is_on_cooldown(plate_text):
-            return
-                
-        # START SCAN LOGIC
-        status = "Denied"
+        status = "Denied (Unregistered)"
         vehicle_info = None
+        action = "Entry"
         
+        # 1. Global Plate String Cooldown (Early Exit)
         search_plate = plate_text.replace(" ", "").replace("-", "")
+        if is_on_cooldown(search_plate):
+            return
+
+        # 2. Database Lookup
         regex_pattern = "^" + "[\\s\\-]*".join(list(search_plate)) + "$"
-        
-        # Database vehicle lookup
         vehicle = vehicles_collection.find_one({"plate_number": {"$regex": regex_pattern, "$options": "i"}})
         
         if not vehicle:
@@ -143,7 +141,12 @@ def log_plate_detection(plate_text: str, frame=None):
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
             vehicle_info = vehicle
             
-            # Lookup Owner (Always refresh to get latest email/phone)
+            # Registered ID Cooldown (Early Exit)
+            if is_on_cooldown(vehicle["id"]):
+                return
+                
+            status = "Authorized"
+            # Refresh owner data
             from bson import ObjectId
             if vehicle.get("owner_id"):
                 owner_record = users_collection.find_one({"_id": ObjectId(vehicle["owner_id"])})
@@ -151,18 +154,8 @@ def log_plate_detection(plate_text: str, frame=None):
                     vehicle_info["owner_name"] = owner_record.get("name", vehicle_info.get("owner_name", "Unknown"))
                     vehicle_info["owner_email"] = owner_record.get("email")
                     vehicle_info["owner_phone"] = owner_record.get("phone")
-            
-            v_status = vehicle.get("status", "").strip().upper()
-            if v_status == "ACTIVE":
-                status = "Authorized"
-            
-            # 2. Registered ID Cooldown (Early Exit)
-            if is_on_cooldown(vehicle["id"]):
-                return
-        else:
-             status = "Denied (Unregistered)"
-             
-        # Image Capture
+
+        # 3. Image Capture
         image_url = None
         if frame is not None and hasattr(frame, 'shape'):
              try:
@@ -170,74 +163,57 @@ def log_plate_detection(plate_text: str, frame=None):
                  filepath = os.path.join(CAPTURES_DIR, filename)
                  if cv2.imwrite(filepath, frame):
                      image_url = f"/static/captures/{filename}"
-                     print(f"[STREAM DETECT] Image saved: {filename}", flush=True)
-             except Exception as e:
-                 print(f"[STREAM DETECT] Image Save Error: {e}", flush=True)
+             except: pass
              
-        # Determine Entry/Exit
-        action = "Entry"
-        # ONLY track state for REGISTERED vehicles to avoid "None" collision
+        # 4. Entry/Exit Determination
         if vehicle_info and vehicle_info.get("id"):
             last_log = access_logs_collection.find_one({"vehicle_id": vehicle_info["id"]}, sort=[("timestamp", -1)])
             if last_log:
                 last_log_action = last_log.get("action")
                 last_log_time_str = last_log.get("timestamp")
-                if last_log_time_str:
-                    try:
-                        last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
-                        time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
-                        
-                        # RACE CONDITION PROTECTION
-                        if abs(time_diff) < 0.5:
-                            action = "Ignored"
-                        elif 0.5 <= time_diff < LOG_COOLDOWN_SECONDS:
-                            action = "Ignored"
-                        else:
-                            action = "Exit" if last_log_action == "Entry" else "Entry"
-                    except Exception as e:
-                        print(f"Time parsing error: {e}", flush=True)
-
-        if action != "Ignored":
-            log_data = {
-                "plate_detected": plate_text,
-                "action": action, 
-                "status": "GRANTED" if status == "Authorized" else "DENIED",
-                "timestamp": datetime.now().isoformat(),
-                "image_url": image_url,
-                "vehicle_id": vehicle_info.get("id") if vehicle_info else None
-            }
-            
-            if status == "Authorized":
-                result = access_logs_collection.insert_one(log_data)
-                log_entry_id = str(result.inserted_id)
-                
-                # Notifications
-                owner_name = vehicle_info.get("owner_name", "Unknown")
-                owner_email = vehicle_info.get("owner_email")
-                owner_phone = vehicle_info.get("owner_phone")
-                current_time_str = datetime.now().strftime("%I:%M %p")
-
-                if owner_phone:
-                    print(f"[STREAM DETECT] Triggering SMS to {owner_phone}", flush=True)
-                    send_access_sms(owner_phone, owner_name, plate_text, current_time_str, action)
+                try:
+                    last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
+                    time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
                     
-                if owner_email:
-                    try:
-                        send_access_email(owner_email, owner_name, plate_text, current_time_str, action)
-                    except Exception as email_err:
-                        print(f"[ERROR] Email Dispatch Failed: {email_err}", flush=True)
-            else:
-                denied_logs_collection.insert_one(log_data)
-                log_entry_id = f"denied_{int(current_time)}"
-        else:
-            status = "Cooldown Active"
-            log_entry_id = f"ignored_{int(current_time)}"
+                    if time_diff < LOG_COOLDOWN_SECONDS:
+                        return # Silent exit for rapid redundant scans
+                    
+                    action = "Exit" if last_log_action == "Entry" else "Entry"
+                except: pass
 
-        # Final Hardware response
-        if BUZZER_AVAILABLE:
-            buzz_granted() if status == "Authorized" else buzz_denied()
+        # 5. Commit Scan result
+        log_data = {
+            "plate_detected": plate_text,
+            "action": action, 
+            "status": "GRANTED" if status == "Authorized" else "DENIED",
+            "timestamp": datetime.now().isoformat(),
+            "image_url": image_url,
+            "vehicle_id": vehicle_info.get("id") if vehicle_info else None
+        }
         
-        # Update Web Dashboard Polling
+        log_entry_id = f"gen_{int(current_time)}"
+        if status == "Authorized":
+            result = access_logs_collection.insert_one(log_data)
+            log_entry_id = str(result.inserted_id)
+            
+            # Notifications
+            owner_name = vehicle_info.get("owner_name", "Unknown")
+            owner_email = vehicle_info.get("owner_email")
+            owner_phone = vehicle_info.get("owner_phone")
+            current_time_str = datetime.now().strftime("%I:%M %p")
+
+            if owner_phone:
+                send_access_sms(owner_phone, owner_name, plate_text, current_time_str, action)
+            if owner_email:
+                try: send_access_email(owner_email, owner_name, plate_text, current_time_str, action)
+                except: pass
+                
+            if BUZZER_AVAILABLE: buzz_granted()
+        else:
+            denied_logs_collection.insert_one(log_data)
+            if BUZZER_AVAILABLE: buzz_denied()
+
+        # Update last scan for web polling
         safe_info = None
         if vehicle_info:
             safe_info = vehicle_info.copy()
@@ -254,9 +230,11 @@ def log_plate_detection(plate_text: str, frame=None):
             "image_url": image_url
         }
         
-        set_cooldown(plate_text)
+        # Set cooldowns for both the raw string and the ID
+        set_cooldown(search_plate)
         if vehicle_info: set_cooldown(vehicle_info.get("id"))
-        print(f"[STREAM DETECT] Completed: {plate_text} | Status: {status}", flush=True)
+        
+        print(f"[STREAM DETECT] {action} Logged: {plate_text} | Status: {status}", flush=True)
 
     except Exception as top_err:
         import traceback
