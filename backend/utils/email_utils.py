@@ -59,7 +59,7 @@ def send_access_email(recipient_email, owner_name, plate_number, time_str, actio
     body_text = (
         f"Hi {owner_name},\n\n"
         f"Your vehicle with plate number {plate_number} has {action_str} the university campus at {time_str}.\n\n"
-        f"If this wasn't you, please manage your vehicles in the IntelliAccess Dashboard immediately.\n\n"
+        f"If this wasn't you, please manage your vehicles in the IntelliAccess Dashboard at https://intelliaccess.online immediately.\n\n"
         f"Security Team\nIntelliAccess System"
     )
 
@@ -78,7 +78,7 @@ def send_access_email(recipient_email, owner_name, plate_number, time_str, actio
             <p style="margin: 5px 0;"><strong>Time:</strong> {time_str}</p>
           </div>
           
-          <p>If you did not authorize this movement, please log in to your dashboard immediately or contact Campus Security.</p>
+          <p>If you did not authorize this movement, please log in to your dashboard at <a href="https://intelliaccess.online" style="color: #3498db; text-decoration: none; font-weight: bold;">intelliaccess.online</a> immediately or contact Campus Security.</p>
           
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #7f8c8d;">
             <p>Thank you,<br><strong>IntelliAccess Team</strong></p>
