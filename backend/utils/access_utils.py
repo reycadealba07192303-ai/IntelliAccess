@@ -6,7 +6,7 @@ import threading
 access_cooldowns = {}
 cooldown_lock = threading.Lock()
 
-LOG_COOLDOWN_SECONDS = 60
+LOG_COOLDOWN_SECONDS = 10
 
 def is_on_cooldown(identifier: str) -> bool:
     """Check if a plate or vehicle ID is currently on cooldown."""

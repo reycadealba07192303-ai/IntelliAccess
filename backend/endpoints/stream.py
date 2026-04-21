@@ -73,7 +73,7 @@ ocr_worker_active = False
 # Cooldown tracking (Per-plate dictionary)
 # Format: { "ABC-123": timestamp }
 plate_cooldowns = {}
-LOG_COOLDOWN_SECONDS = 60 
+LOG_COOLDOWN_SECONDS = 10 
 
 # Latest Scan Result for frontend polling
 latest_scan_result = None
