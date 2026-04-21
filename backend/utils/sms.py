@@ -30,15 +30,19 @@ def _send_sms_thread(phone_number: str, message: str, owner_name: str = "Owner")
             
     _sms_cooldowns[phone_number] = current_time
 
-    # Ensure it's in the +639... format as per documentation
-    cleaned_phone = phone_number.replace(" ", "").replace("-", "").replace("+", "")
+    # Ensure it's in the +639... format as per documentation and dashboard evidence
+    digits = "".join(filter(str.isdigit, phone_number))
     
-    if cleaned_phone.startswith("09") and len(cleaned_phone) == 11:
-        cleaned_phone = "+63" + cleaned_phone[1:]
-    elif cleaned_phone.startswith("9") and len(cleaned_phone) == 10:
-        cleaned_phone = "+63" + cleaned_phone
-    elif cleaned_phone.startswith("639") and len(cleaned_phone) == 12:
-        cleaned_phone = "+" + cleaned_phone
+    # Handle Philippine numbers precisely
+    if digits.startswith("09") and len(digits) == 11:
+        cleaned_phone = "+63" + digits[1:]
+    elif digits.startswith("9") and len(digits) == 10:
+        cleaned_phone = "+63" + digits
+    elif digits.startswith("639") and len(digits) == 12:
+        cleaned_phone = "+" + digits
+    else:
+        # Fallback for already international or unknown formats
+        cleaned_phone = "+" + digits if not digits.startswith("+") else digits
          
     url = "https://smsapiph.onrender.com/api/v1/send/sms"
     
@@ -64,11 +68,11 @@ def _send_sms_thread(phone_number: str, message: str, owner_name: str = "Owner")
                 type="alert"
             )
         else:
-            error_msg = f"Failed to send SMS to {owner_name} ({cleaned_phone}). Status: {response.status_code}, Response: {response.text}"
+            error_msg = f"Failed to send SMS to {owner_name} ({cleaned_phone}). Status: {response.status_code}. Details: {response.text}"
             print(f"[SMS ERROR] {error_msg}")
             log_notification(
                 title="SMS Delivery Failed",
-                message=f"SMS error for {owner_name}: {response.text}",
+                message=f"API returned {response.status_code} for {owner_name}. Check credits/format.",
                 type="alert"
             )
     except Exception as e:
