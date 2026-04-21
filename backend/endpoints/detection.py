@@ -380,15 +380,21 @@ async def detect_vehicle(file: UploadFile = File(...)):
                     if vehicle.get("owner_id"):
                         from bson import ObjectId
                         try:
-                            owner_record = users_collection.find_one({"_id": ObjectId(vehicle["owner_id"])})
+                            o_id = vehicle["owner_id"]
+                            # Convert string ID to ObjectId if needed
+                            o_query_id = ObjectId(o_id) if isinstance(o_id, str) else o_id
+                            
+                            owner_record = users_collection.find_one({"_id": o_query_id})
                             if owner_record:
                                 # Get all owner details
                                 vehicle_info["owner_name"] = owner_record.get("name", "Unknown")
                                 vehicle_info["owner_role"] = owner_record.get("role", "GUEST")
                                 owner_phone = owner_record.get("phone")
-                                print(f"[SMS] Owner found: {vehicle_info['owner_name']}, Phone: {owner_phone}")
+                                print(f"[SMS-DEBUG] Owner found: {vehicle_info['owner_name']}, Phone: {owner_phone}")
+                            else:
+                                print(f"[SMS-DEBUG] Owner ID {o_id} not found in users collection.")
                         except Exception as owner_e:
-                            print(f"[SMS] Error fetching owner: {owner_e}")
+                            print(f"[SMS-DEBUG] Error fetching owner for ID {vehicle.get('owner_id')}: {owner_e}")
                     
                     # 2. Check status
                     v_status = vehicle.get("status", "").strip().upper()

@@ -235,13 +235,20 @@ def _process_rfid_tag(tag_id: str):
         if vehicle_info.get("owner_id"):
             try:
                 from bson import ObjectId
-                owner_doc = users_collection.find_one({"_id": ObjectId(vehicle_info["owner_id"])})
+                o_id = vehicle_info["owner_id"]
+                # Convert string ID to ObjectId if needed
+                o_query_id = ObjectId(o_id) if isinstance(o_id, str) else o_id
+                
+                owner_doc = users_collection.find_one({"_id": o_query_id})
                 if owner_doc:
                     owner_phone = owner_doc.get("phone")
                     if "owner_name" not in vehicle_info:
                         vehicle_info["owner_name"] = owner_doc.get("name", "Unknown")
+                    print(f"[RFID-SMS-DEBUG] Owner found: {vehicle_info['owner_name']}, Phone: {owner_phone}")
+                else:
+                    print(f"[RFID-SMS-DEBUG] Owner ID {o_id} not found in users collection.")
             except Exception as ex:
-                print(f"[RFID] Failed to lookup owner: {ex}")
+                print(f"[RFID-SMS-DEBUG] Failed to lookup owner for ID {vehicle_info.get('owner_id')}: {ex}")
                 
         # Check Vehicle-ID based cooldown
         vehicle_id = vehicle["id"] 
