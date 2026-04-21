@@ -16,15 +16,15 @@ def _send_sms_thread(phone_number: str, message: str, owner_name: str = "Owner")
         print(f"[SMS WARNING] Invalid or missing phone number: '{phone_number}'")
         return
 
-    # Ensure it's in the standard Philippine format
+    # Ensure it's in the +639... format as per documentation
     cleaned_phone = phone_number.replace(" ", "").replace("-", "").replace("+", "")
     
-    # We want it in 09... format for the API or 639... depending on what it likes better.
-    # The format test showed 09... works perfectly with this API.
-    if cleaned_phone.startswith("63"):
-        cleaned_phone = "0" + cleaned_phone[2:]
-    elif not cleaned_phone.startswith("0"):
-        cleaned_phone = "0" + cleaned_phone
+    if cleaned_phone.startswith("09") and len(cleaned_phone) == 11:
+        cleaned_phone = "+63" + cleaned_phone[1:]
+    elif cleaned_phone.startswith("9") and len(cleaned_phone) == 10:
+        cleaned_phone = "+63" + cleaned_phone
+    elif cleaned_phone.startswith("639") and len(cleaned_phone) == 12:
+        cleaned_phone = "+" + cleaned_phone
          
     url = "https://smsapiph.onrender.com/api/v1/send/sms"
     
