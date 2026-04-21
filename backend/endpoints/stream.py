@@ -258,14 +258,19 @@ def log_plate_detection(plate_text: str, frame=None):
                     try:
                         last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
-                        
-                        # MANDATORY 1-MINUTE COOLDOWN BETWEEN ANY STATE CHANGE
-                        if time_diff < 60:
+                        # RACE CONDITION & CLOCK DRIFT PROTECTION
+                        # If diff is tiny (less than 0.5s), it's a parallel thread/request.
+                        # If diff is between 0.5s and COOLDOWN, it's a legitimate duplicate scan.
+                        if -1.0 < time_diff < 0.5:
+                            print(f"[DEBUG COOLDOWN] Race condition detected ({time_diff:.3f}s). Ignoring redundant request.")
+                            action = "Ignored"
+                        elif 0.5 <= time_diff < LOG_COOLDOWN_SECONDS:
                             print(f"[STREAM DETECT] Ignored. Vehicle {plate_text} recently {last_log_action.lower()}ed ({time_diff:.1f}s ago).")
                             action = "Ignored"
                         else:
                             # TICKET TOGGLE: Entry -> Exit, Exit -> Entry
                             action = "Exit" if last_log_action == "Entry" else "Entry"
+                            print(f"[DEBUG COOLDOWN] Valid {action} state change (Last was {time_diff:.1f}s ago).")
                             
                     except Exception as e:
                         print(f"Time parsing error: {e}")
@@ -275,6 +280,7 @@ def log_plate_detection(plate_text: str, frame=None):
             else:
                 # No history? Start with Entry.
                 action = "Entry"
+                print(f"[DEBUG COOLDOWN] Fresh start for {plate_text} (No records found).")
         # Insert access log
         log_entry_id = f"ignored_{int(current_time)}"
         try:
