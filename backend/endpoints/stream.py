@@ -166,6 +166,7 @@ def log_plate_detection(plate_text: str, frame=None):
                 print(f"[STREAM DETECT] AI OCR '{search_plate}' fuzzy matched to DB '{best_match.get('plate_number')}' (ratio {highest_ratio:.2f})")
         
         if vehicle:
+            print(f"[DEBUG 1] Vehicle Found: {plate_text}")
             # Ensure we have a string 'id' for cooldowns/logging without deleting original '_id'
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
             vehicle_info = vehicle
@@ -239,6 +240,7 @@ def log_plate_detection(plate_text: str, frame=None):
                 if owner_doc:
                     owner_phone = owner_doc.get("phone")
                     owner_email = owner_doc.get("email")
+                    print(f"[DEBUG 2] Owner Found: {owner_doc.get('name')} | Email: {owner_email} | Phone: {owner_phone}")
             
             last_log = access_logs_collection.find_one(
                 {"vehicle_id": vehicle_info.get("id")},
@@ -289,9 +291,13 @@ def log_plate_detection(plate_text: str, frame=None):
                     log_data["vehicle_id"] = vehicle_info.get("id")
                     
                 if status == "Authorized":
+                    print(f"[DEBUG 3] Inserting Access Log for {plate_text}...")
                     result = access_logs_collection.insert_one(log_data)
+                    print(f"[DEBUG 4] Log Inserted Successfully.")
                 else:
+                    print(f"[DEBUG 3] Inserting Denied Log for {plate_text}...")
                     result = denied_logs_collection.insert_one(log_data)
+                    print(f"[DEBUG 4] Denied Log Inserted.")
                     
                 log_entry_id = str(result.inserted_id)
                 
@@ -324,14 +330,18 @@ def log_plate_detection(plate_text: str, frame=None):
                         
                     if owner_email:
                         # Send Email for both Entry and Exit
-                        print(f"[STREAM DETECT] Triggering {action} Email to {owner_name} ({owner_email}) for plate {plate_text}")
-                        send_access_email(
-                            recipient_email=owner_email,
-                            owner_name=owner_name,
-                            plate_number=plate_text,
-                            time_str=current_time_str,
-                            action=action
-                        )
+                        print(f"[DEBUG 5] Attempting to trigger Email to {owner_email}...")
+                        try:
+                            send_access_email(
+                                recipient_email=owner_email,
+                                owner_name=owner_name,
+                                plate_number=plate_text,
+                                time_str=current_time_str,
+                                action=action
+                            )
+                            print(f"[DEBUG 6] send_access_email function called (Thread initiated).")
+                        except Exception as email_err:
+                            print(f"[DEBUG ERROR] Failed to call send_access_email: {email_err}")
                     else:
                         print(f"[STREAM DETECT] Email skipped for {plate_text}: No email address found for owner {owner_name}")
                 # --- END SMS INTEGRATION ---
