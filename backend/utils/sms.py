@@ -30,19 +30,17 @@ def _send_sms_thread(phone_number: str, message: str, owner_name: str = "Owner")
             
     _sms_cooldowns[phone_number] = current_time
 
-    # Ensure it's in the +639... format as per documentation and dashboard evidence
+    # Revert to 11-digit local format (09...) which was working previously
     digits = "".join(filter(str.isdigit, phone_number))
     
-    # Handle Philippine numbers precisely
-    if digits.startswith("09") and len(digits) == 11:
-        cleaned_phone = "+63" + digits[1:]
-    elif digits.startswith("9") and len(digits) == 10:
-        cleaned_phone = "+63" + digits
-    elif digits.startswith("639") and len(digits) == 12:
-        cleaned_phone = "+" + digits
+    if len(digits) == 11 and digits.startswith("09"):
+        cleaned_phone = digits
+    elif len(digits) == 10 and digits.startswith("9"):
+        cleaned_phone = "0" + digits
+    elif len(digits) == 12 and digits.startswith("639"):
+        cleaned_phone = "0" + digits[2:]
     else:
-        # Fallback for already international or unknown formats
-        cleaned_phone = "+" + digits if not digits.startswith("+") else digits
+        cleaned_phone = digits
          
     url = "https://smsapiph.onrender.com/api/v1/send/sms"
     
@@ -90,7 +88,7 @@ def send_access_sms(phone_number: str, owner_name: str, plate_number: str, time_
     """
     action_str = "entered" if action.lower() == "entry" else "exited"
         
-    message = f"IntelliAccess: Vehicle {plate_number} {action_str} the campus at {time_str}. If not you, contact Security."
+    message = f"IntelliAccess: Vehicle {plate_number} {action_str} the campus at {time_str}. If not you, remove this vehicle in your Dashboard."
     
     # Start a new thread so the main video stream isn't stalled by network requests
     thread = threading.Thread(target=_send_sms_thread, args=(phone_number, message, owner_name))
