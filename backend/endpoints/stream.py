@@ -127,22 +127,17 @@ def log_plate_detection(plate_text: str, frame=None):
         vehicle = vehicles_collection.find_one({"plate_number": {"$regex": regex_pattern, "$options": "i"}})
         
         if not vehicle:
-             loose_regex = "[\\s\\-]*".join(list(search_plate))
-             vehicle = vehicles_collection.find_one({"plate_number": {"$regex": loose_regex, "$options": "i"}})
-             
-        if not vehicle:
+            # Fuzzy fallback
             import difflib
-            all_v = list(vehicles_collection.find({}))
-            best_match, highest_ratio = None, 0.0
+            all_v = list(vehicles_collection.find())
+            highest_ratio, best_match = 0, None
             for v in all_v:
-                db_p = v.get("plate_number", "").replace(" ", "").replace("-", "").upper()
-                if not db_p: continue
+                db_p = v.get("plate_number", "").replace(" ", "").replace("-", "")
                 ratio = difflib.SequenceMatcher(None, search_plate, db_p).ratio()
                 if ratio > highest_ratio:
                     highest_ratio, best_match = ratio, v
             if highest_ratio >= 0.70 and best_match:
                 vehicle = best_match
-                print(f"[STREAM DETECT] Fuzzy Match: {search_plate} -> {best_match.get('plate_number')} ({highest_ratio:.2f})", flush=True)
         
         if vehicle:
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
@@ -161,8 +156,8 @@ def log_plate_detection(plate_text: str, frame=None):
             if v_status == "ACTIVE":
                 status = "Authorized"
             
-            if vehicle.get("id") and is_on_cooldown(vehicle["id"]):
-                print(f"[STREAM] Cooldown Active for ID {vehicle['id']}", flush=True)
+            # 2. Registered ID Cooldown (Early Exit)
+            if is_on_cooldown(vehicle["id"]):
                 return
         else:
              status = "Denied (Unregistered)"
@@ -181,7 +176,8 @@ def log_plate_detection(plate_text: str, frame=None):
              
         # Determine Entry/Exit
         action = "Entry"
-        if vehicle_info:
+        # ONLY track state for REGISTERED vehicles to avoid "None" collision
+        if vehicle_info and vehicle_info.get("id"):
             last_log = access_logs_collection.find_one({"vehicle_id": vehicle_info["id"]}, sort=[("timestamp", -1)])
             if last_log:
                 last_log_action = last_log.get("action")
@@ -192,15 +188,11 @@ def log_plate_detection(plate_text: str, frame=None):
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
                         
                         # RACE CONDITION PROTECTION
-                        # If diff is extremely tiny (between -0.5s and 0.5s), it's a parallel request.
-                        # We ignore it to prevent double-logging.
                         if abs(time_diff) < 0.5:
                             action = "Ignored"
                         elif 0.5 <= time_diff < LOG_COOLDOWN_SECONDS:
-                            print(f"[STREAM DETECT] Cooldown Active ({time_diff:.1f}s ago).", flush=True)
                             action = "Ignored"
                         else:
-                            # State change only if time_diff is significant
                             action = "Exit" if last_log_action == "Entry" else "Entry"
                     except Exception as e:
                         print(f"Time parsing error: {e}", flush=True)
