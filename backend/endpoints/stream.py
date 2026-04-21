@@ -120,13 +120,6 @@ def log_plate_detection(plate_text: str, frame=None):
         status = "Denied"
         vehicle_info = None
         
-        # Diagnostic: Check Gmail Credentials
-        from utils.email_utils import GMAIL_APP_PASSWORD, GMAIL_USER
-        if GMAIL_APP_PASSWORD:
-            print(f"[DEBUG EMAIL] Gmail Configured: {GMAIL_USER} (Password Length: {len(GMAIL_APP_PASSWORD)})", flush=True)
-        else:
-            print("[DEBUG EMAIL] CRITICAL: GMAIL_APP_PASSWORD IS EMPTY", flush=True)
-
         search_plate = plate_text.replace(" ", "").replace("-", "")
         regex_pattern = "^" + "[\\s\\-]*".join(list(search_plate)) + "$"
         
@@ -152,7 +145,6 @@ def log_plate_detection(plate_text: str, frame=None):
                 print(f"[STREAM DETECT] Fuzzy Match: {search_plate} -> {best_match.get('plate_number')} ({highest_ratio:.2f})", flush=True)
         
         if vehicle:
-            print(f"[DEBUG 1] Vehicle Found: {plate_text}", flush=True)
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
             vehicle_info = vehicle
             
@@ -164,7 +156,6 @@ def log_plate_detection(plate_text: str, frame=None):
                     vehicle_info["owner_name"] = owner_record.get("name", vehicle_info.get("owner_name", "Unknown"))
                     vehicle_info["owner_email"] = owner_record.get("email")
                     vehicle_info["owner_phone"] = owner_record.get("phone")
-                    print(f"[DEBUG 2] Owner Data Loaded: {vehicle_info['owner_name']} | Email: {vehicle_info.get('owner_email')}", flush=True)
             
             v_status = vehicle.get("status", "").strip().upper()
             if v_status == "ACTIVE":
@@ -204,7 +195,6 @@ def log_plate_detection(plate_text: str, frame=None):
                         # If diff is extremely tiny (between -0.5s and 0.5s), it's a parallel request.
                         # We ignore it to prevent double-logging.
                         if abs(time_diff) < 0.5:
-                            print(f"[DEBUG COOLDOWN] Race condition ({time_diff:.3f}s). Ignoring redundant parallel thread.", flush=True)
                             action = "Ignored"
                         elif 0.5 <= time_diff < LOG_COOLDOWN_SECONDS:
                             print(f"[STREAM DETECT] Cooldown Active ({time_diff:.1f}s ago).", flush=True)
@@ -212,7 +202,6 @@ def log_plate_detection(plate_text: str, frame=None):
                         else:
                             # State change only if time_diff is significant
                             action = "Exit" if last_log_action == "Entry" else "Entry"
-                            print(f"[DEBUG COOLDOWN] Valid State Change: {action} (Last was {time_diff:.1f}s ago)", flush=True)
                     except Exception as e:
                         print(f"Time parsing error: {e}", flush=True)
 
@@ -227,10 +216,8 @@ def log_plate_detection(plate_text: str, frame=None):
             }
             
             if status == "Authorized":
-                print(f"[DEBUG 3] Inserting Access Log...", flush=True)
                 result = access_logs_collection.insert_one(log_data)
                 log_entry_id = str(result.inserted_id)
-                print(f"[DEBUG 4] Inserted ID: {log_entry_id}", flush=True)
                 
                 # Notifications
                 owner_name = vehicle_info.get("owner_name", "Unknown")
@@ -243,14 +230,11 @@ def log_plate_detection(plate_text: str, frame=None):
                     send_access_sms(owner_phone, owner_name, plate_text, current_time_str, action)
                     
                 if owner_email:
-                    print(f"[DEBUG 5] Triggering Email to {owner_email}...", flush=True)
                     try:
                         send_access_email(owner_email, owner_name, plate_text, current_time_str, action)
-                        print(f"[DEBUG 6] Email Thread Started.", flush=True)
                     except Exception as email_err:
-                        print(f"[DEBUG ERROR] Email Dispatch Failed: {email_err}", flush=True)
+                        print(f"[ERROR] Email Dispatch Failed: {email_err}", flush=True)
             else:
-                print(f"[DEBUG 3] Inserting Denied Log...", flush=True)
                 denied_logs_collection.insert_one(log_data)
                 log_entry_id = f"denied_{int(current_time)}"
         else:

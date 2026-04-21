@@ -37,11 +37,8 @@ def _send_email_thread(recipient_email, subject, body_text, body_html):
         message.attach(part2)
 
         # Connect and send
-        print(f"[DEBUG EMAIL] Connecting to Gmail SMTP for {recipient_email}...")
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            print(f"[DEBUG EMAIL] Logging in as {GMAIL_USER}...")
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            print(f"[DEBUG EMAIL] Sending mail...")
             server.sendmail(GMAIL_USER, recipient_email, message.as_string())
             
         print(f"[EMAIL SUCCESS] Notification sent to {recipient_email}")
