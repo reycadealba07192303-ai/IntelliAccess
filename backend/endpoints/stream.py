@@ -178,8 +178,11 @@ def log_plate_detection(plate_text: str, frame=None):
                     try:
                         owner_record = users_collection.find_one({"_id": ObjectId(vehicle["owner_id"])})
                         if owner_record:
+                            # Convert ObjectId to string for JSON safety later
+                            owner_record["id"] = str(owner_record["_id"])
                             vehicle_info["owner_name"] = owner_record.get("name", "Unknown")
                             vehicle_info["owner_role"] = owner_record.get("role", "GUEST")
+                            vehicle_info["owner_email"] = owner_record.get("email")
                     except Exception as ex:
                         print(f"Failed to lookup owner in log_plate_detection: {ex}")
             
@@ -361,6 +364,15 @@ def log_plate_detection(plate_text: str, frame=None):
         
         print(f"\n[STREAM DETECT] Logged Plate: {plate_text} | Status: {status}")
         
+        # Create a JSON-safe copy of vehicle_info (no ObjectIds)
+        safe_vehicle_info = None
+        if vehicle_info:
+            safe_vehicle_info = vehicle_info.copy()
+            if "_id" in safe_vehicle_info:
+                safe_vehicle_info["_id"] = str(safe_vehicle_info["_id"])
+            if "owner_id" in safe_vehicle_info:
+                safe_vehicle_info["owner_id"] = str(safe_vehicle_info["owner_id"])
+
         # Update frontend polling object
         latest_scan_result = {
             "id": log_entry_id, # Add unique ID so frontend knows it's a new event
@@ -368,7 +380,7 @@ def log_plate_detection(plate_text: str, frame=None):
             "plate_number": plate_text,
             "access_granted": status == "Authorized",
             "access_status": "GRANTED" if status == "Authorized" else status.upper(),
-            "vehicle_info": vehicle_info,
+            "vehicle_info": safe_vehicle_info,
             "image_url": image_url
         }
         
