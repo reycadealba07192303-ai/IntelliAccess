@@ -125,7 +125,7 @@ def log_plate_detection(plate_text: str, frame=None):
         vehicle = vehicles_collection.find_one({"plate_number": {"$regex": regex_pattern, "$options": "i"}})
         
         if not vehicle:
-            # Fuzzy fallback
+            # Fuzzy fallback - Increased threshold to 0.85 for 6-char plates
             import difflib
             all_v = list(vehicles_collection.find())
             highest_ratio, best_match = 0, None
@@ -134,8 +134,9 @@ def log_plate_detection(plate_text: str, frame=None):
                 ratio = difflib.SequenceMatcher(None, search_plate, db_p).ratio()
                 if ratio > highest_ratio:
                     highest_ratio, best_match = ratio, v
-            if highest_ratio >= 0.70 and best_match:
+            if highest_ratio >= 0.85 and best_match:
                 vehicle = best_match
+                print(f"[STREAM DETECT] Fuzzy Match Used: {search_plate} -> {best_match.get('plate_number')} ({highest_ratio:.2f})", flush=True)
         
         if vehicle:
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
@@ -143,6 +144,7 @@ def log_plate_detection(plate_text: str, frame=None):
             
             # Registered ID Cooldown (Early Exit)
             if is_on_cooldown(vehicle["id"]):
+                print(f"[STREAM DETECT] Cooldown Active for ID: {vehicle['id']}", flush=True)
                 return
                 
             status = "Authorized"
@@ -167,19 +169,23 @@ def log_plate_detection(plate_text: str, frame=None):
              
         # 4. Entry/Exit Determination
         if vehicle_info and vehicle_info.get("id"):
+            # Find the ABSOLUTE LATEST log for this specific vehicle
             last_log = access_logs_collection.find_one({"vehicle_id": vehicle_info["id"]}, sort=[("timestamp", -1)])
             if last_log:
-                last_log_action = last_log.get("action")
+                last_log_action = last_log.get("action", "Exit")
                 last_log_time_str = last_log.get("timestamp")
                 try:
                     last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
-                    time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
+                    now_aware = datetime.now(last_time_obj.tzinfo)
+                    time_diff = (now_aware - last_time_obj).total_seconds()
                     
                     if time_diff < LOG_COOLDOWN_SECONDS:
-                        return # Silent exit for rapid redundant scans
+                        print(f"[STREAM DETECT] Recent log found ({time_diff:.1f}s ago). Cooldown suppression.", flush=True)
+                        return 
                     
                     action = "Exit" if last_log_action == "Entry" else "Entry"
-                except: pass
+                except: 
+                    action = "Entry"
 
         # 5. Commit Scan result
         log_data = {
@@ -234,7 +240,7 @@ def log_plate_detection(plate_text: str, frame=None):
         set_cooldown(search_plate)
         if vehicle_info: set_cooldown(vehicle_info.get("id"))
         
-        print(f"[STREAM DETECT] {action} Logged: {plate_text} | Status: {status}", flush=True)
+        print(f"[STREAM DETECT] {action.upper()} Logged: {plate_text} | Status: {status}", flush=True)
 
     except Exception as top_err:
         import traceback
