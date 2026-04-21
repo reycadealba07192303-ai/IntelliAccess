@@ -156,15 +156,15 @@ def log_plate_detection(plate_text: str, frame=None):
             vehicle["id"] = str(vehicle.get("_id", "unknown"))
             vehicle_info = vehicle
             
-            # Lookup Owner
-            if "owner_name" not in vehicle_info or vehicle_info["owner_name"] == "Unknown":
-                from bson import ObjectId
-                if vehicle.get("owner_id"):
-                    owner_record = users_collection.find_one({"_id": ObjectId(vehicle["owner_id"])})
-                    if owner_record:
-                        vehicle_info["owner_name"] = owner_record.get("name", "Unknown")
-                        vehicle_info["owner_email"] = owner_record.get("email")
-                        vehicle_info["owner_phone"] = owner_record.get("phone")
+            # Lookup Owner (Always refresh to get latest email/phone)
+            from bson import ObjectId
+            if vehicle.get("owner_id"):
+                owner_record = users_collection.find_one({"_id": ObjectId(vehicle["owner_id"])})
+                if owner_record:
+                    vehicle_info["owner_name"] = owner_record.get("name", vehicle_info.get("owner_name", "Unknown"))
+                    vehicle_info["owner_email"] = owner_record.get("email")
+                    vehicle_info["owner_phone"] = owner_record.get("phone")
+                    print(f"[DEBUG 2] Owner Data Loaded: {vehicle_info['owner_name']} | Email: {vehicle_info.get('owner_email')}", flush=True)
             
             v_status = vehicle.get("status", "").strip().upper()
             if v_status == "ACTIVE":
@@ -197,6 +197,7 @@ def log_plate_detection(plate_text: str, frame=None):
                 last_log_time_str = last_log.get("timestamp")
                 if last_log_time_str:
                     try:
+                        last_time_obj = datetime.fromisoformat(last_log_time_str.replace("Z", "+00:00"))
                         time_diff = (datetime.now(last_time_obj.tzinfo) - last_time_obj).total_seconds()
                         
                         # RACE CONDITION PROTECTION
