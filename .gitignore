@@ -70,3 +70,7 @@ node_modules/
 
 # AI Captures
 static/captures/
+
+# Python cache
+__pycache__/
+*.py[cod]
